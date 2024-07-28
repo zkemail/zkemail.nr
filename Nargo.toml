@@ -1,0 +1,9 @@
+[package]
+name = "noir_zkemail"
+type = "bin"
+authors = [""]
+compiler_version = ">=0.32.0"
+
+[dependencies]
+noir_rsa = { path = "../noir_rsa" }
+bignum = { path = "../noir-bignum" }
