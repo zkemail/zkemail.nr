@@ -49,15 +49,18 @@ fn main() {
     let pem_key = extract_and_format_dkim_public_key(&dkim_record).unwrap();
     let public_key = RsaPublicKey::from_public_key_pem(&pem_key).unwrap();
 
-    // Print the noir format
+    // extract signature
+    let mut signature = parse_dkim_signature(&dkim_header.to_string());
+
+    // extract body hash
+    let mut body_hash = general_purpose::STANDARD
+        .decode(parsed_header.body_hash.as_ref().unwrap())
+        .unwrap();
+
     generate_2048_bit_signature_parameters(
-        &general_purpose::STANDARD
-            .decode(parsed_header.signature.as_ref().unwrap())
-            .unwrap(),
+        &signature,
         &public_key,
-        &general_purpose::STANDARD
-            .decode(parsed_header.body_hash.as_ref().unwrap())
-            .unwrap(),
+        &body_hash
     );
 }
 
@@ -167,17 +170,30 @@ pub fn generate_2048_bit_signature_parameters(
         .to_bytes();
 
     let sig_uint: BigUint = BigUint::from_bytes_be(sig_bytes);
-
-    let mut hash = body_hash.clone();
-    hash.reverse();
     let sig_str = bn_limbs(sig_uint.clone(), 2048);
-    println!("let body_hash: [u8; 32] = {:?};", hash);
+    println!("let body_hash: [u8; 32] = {:?};", body_hash);
     println!(
-        "let signature: BNInstance = BigNum::from_array({});",
+        "let signature: BN2048 = BigNum::from_array({});",
         sig_str.as_str()
     );
-    let r = bn_runtime_instance(pubkey.n().clone(), 2048, String::from("BNInstance"));
+    let r = bn_runtime_instance(pubkey.n().clone(), 2048, String::from("instance"));
     println!("{}", r.as_str());
+}
+
+fn parse_dkim_signature(dkim_header: &str) -> Vec<u8> {
+    let b64 = extract_dkim_signature(dkim_header);
+    general_purpose::STANDARD.decode(b64).unwrap()
+}
+
+fn extract_dkim_signature(dkim_header: &str) -> String {
+    let re = Regex::new(r"b=([^;]+)").unwrap();
+    re.captures(dkim_header)
+        .and_then(|caps| caps.get(1).map(|m| clean_dkim_signature(m.as_str())))
+        .unwrap()
+}
+
+fn clean_dkim_signature(dkim_signature: &str) -> String {
+    dkim_signature.replace(&['\t', '\r', '\n', ' '][..], "")
 }
 
 // pub fn try_verify_signature(
@@ -186,7 +202,7 @@ pub fn generate_2048_bit_signature_parameters(
 //     body_hash: &Vec<u8>,
 // ) -> bool {
 //     let verified = pubkey.verify(
-        
+
 //         &body_hash,
 //         &signature,
 //     );
