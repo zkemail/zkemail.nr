@@ -180,17 +180,15 @@ pub fn generate_2048_bit_signature_parameters(
     println!("{}", r.as_str());
 }
 
-pub fn try_verify_signature(
-    pubkey: &RsaPublicKey,
-    signature: &Vec<u8>,
-    body_hash: &Vec<u8>,
-) -> bool {
-    let verified = pubkey.verify(
-        Pkcs {
-            hash: Some(&Sha256::default()),
-        },
-        &body_hash,
-        &signature,
-    );
-    false
-}
+// pub fn try_verify_signature(
+//     pubkey: &RsaPublicKey,
+//     signature: &Vec<u8>,
+//     body_hash: &Vec<u8>,
+// ) -> bool {
+//     let verified = pubkey.verify(
+        
+//         &body_hash,
+//         &signature,
+//     );
+//     false
+// }
