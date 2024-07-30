@@ -69,22 +69,6 @@ fn main() {
     // extract signature
     let signature = parse_dkim_signature(&dkim_header.to_string());
 
-    // println!(
-    //     "Public Key: {:?}",
-    //     hex::encode(public_key.n().to_bytes_be())
-    // );
-    // println!("Signature: {:?}", hex::encode(&signature));
-
-    // // extract body hash
-    // let mut body_hash = general_purpose::STANDARD
-    //     .decode(parsed_header.body_hash.as_ref().unwrap())
-    //     .unwrap();
-
-    // // println!("Body Hash: {:?}", hex::encode(&body_hash));
-    // // println!("Computed Body Hash: {:?}", hex::encode(&body_hash_computed));
-
-    // try_verify_signature(&public_key, &signature, &header_hash);
-
     // print the header array
     println!("{}", make_header_string(&signed_headers));
 
@@ -150,22 +134,6 @@ fn query_dkim_public_key(selector: &str, domain: &str) -> String {
     record
 }
 
-fn extract_public_key(dkim_record: &str) -> Option<Vec<u8>> {
-    let re = Regex::new(r"p=([^;]+)").unwrap();
-    if let Some(caps) = re.captures(dkim_record) {
-        if let Some(pubkey_b64) = caps.get(1) {
-            let pubkey_str = pubkey_b64.as_str();
-            println!("pubkey_str: {:?}", pubkey_str);
-            if let Ok(pubkey_bytes) = general_purpose::STANDARD.decode(pubkey_str) {
-                return Some(pubkey_bytes);
-            } else {
-                println!(" Failed");
-            }
-        }
-    }
-    None
-}
-
 fn extract_and_format_dkim_public_key(dkim_record: &str) -> Result<String, Box<dyn Error>> {
     // Extract the base64-encoded public key using regex
     let re = Regex::new(r"p=([^;]+)")?;
@@ -223,16 +191,6 @@ fn extract_dkim_signature(dkim_header: &str) -> String {
 
 fn clean_dkim_signature(dkim_signature: &str) -> String {
     dkim_signature.replace(&['\t', '\r', '\n', ' '][..], "")
-}
-
-pub fn try_verify_signature(
-    pubkey: &RsaPublicKey,
-    signature: &Vec<u8>,
-    body_hash: &Vec<u8>,
-) -> bool {
-    let verified = pubkey.verify(Pkcs1v15Sign::new_unprefixed(), &body_hash, &signature);
-    println!("Verified: {:?}", verified);
-    verified.is_ok()
 }
 
 pub fn build_relaxed_headers(eml: &Eml) -> RelaxedHeaders {
