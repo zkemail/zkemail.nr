@@ -97,11 +97,13 @@ fn test_main_real() {
 
 #[test]
 fn test_zk_email() {
-        let body_hash: [u8; 32] = dep::std::hash::sha256("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks\n\n15 years ago, Satoshi mined the first block of the Bitcoin blockchain After the Bitcoin white paper appeared on October 31, 2008, on a cryptography mailing list, the Genesis Block — the first bitcoin block and the basis of the entire Bitcoin trading system in place to this day — was mined on January 3, 2009. \n\nThe Genesis Block is also known as Block 0 or Block 1, and is still in the Bitcoin network, where it will remain as long as there is a computer running the Bitcoin software. \n\nAll nodes in the Bitcoin network can consult it, even if it is at the other end of the network with hundreds of thousands of blocks.".as_bytes());
-    print(body_hash);
+    let header: [u8; 472] = [
+        102, 114, 111, 109, 58, 114, 117, 110, 110, 105, 101, 114, 46, 108, 101, 97, 103, 117, 101, 115, 46, 48, 106, 64, 105, 99, 108, 111, 117, 100, 46, 99, 111, 109, 13, 10, 99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 58, 116, 101, 120, 116, 47, 112, 108, 97, 105, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 115, 45, 97, 115, 99, 105, 105, 13, 10, 109, 105, 109, 101, 45, 118, 101, 114, 115, 105, 111, 110, 58, 49, 46, 48, 32, 40, 77, 97, 99, 32, 79, 83, 32, 88, 32, 77, 97, 105, 108, 32, 49, 54, 46, 48, 32, 92, 40, 51, 55, 51, 49, 46, 53, 48, 48, 46, 50, 51, 49, 92, 41, 41, 13, 10, 115, 117, 98, 106, 101, 99, 116, 58, 72, 101, 108, 108, 111, 13, 10, 109, 101, 115, 115, 97, 103, 101, 45, 105, 100, 58, 60, 56, 70, 56, 49, 57, 68, 51, 50, 45, 66, 54, 65, 67, 45, 52, 56, 57, 68, 45, 57, 55, 55, 70, 45, 52, 51, 56, 66, 66, 67, 52, 67, 65, 66, 50, 55, 64, 109, 101, 46, 99, 111, 109, 62, 13, 10, 100, 97, 116, 101, 58, 83, 97, 116, 44, 32, 50, 54, 32, 65, 117, 103, 32, 50, 48, 50, 51, 32, 49, 50, 58, 50, 53, 58, 50, 50, 32, 43, 48, 52, 48, 48, 13, 10, 116, 111, 58, 122, 107, 101, 119, 116, 101, 115, 116, 64, 103, 109, 97, 105, 108, 46, 99, 111, 109, 13, 10, 100, 107, 105, 109, 45, 115, 105, 103, 110, 97, 116, 117, 114, 101, 58, 118, 61, 49, 59, 32, 97, 61, 114, 115, 97, 45, 115, 104, 97, 50, 53, 54, 59, 32, 99, 61, 114, 101, 108, 97, 120, 101, 100, 47, 114, 101, 108, 97, 120, 101, 100, 59, 32, 100, 61, 105, 99, 108, 111, 117, 100, 46, 99, 111, 109, 59, 32, 115, 61, 49, 97, 49, 104, 97, 105, 59, 32, 116, 61, 49, 54, 57, 51, 48, 51, 56, 51, 51, 55, 59, 32, 98, 104, 61, 55, 120, 81, 77, 68, 117, 111, 86, 86, 85, 52, 109, 48, 87, 48, 87, 82, 86, 83, 114, 86, 88, 77, 101, 71, 83, 73, 65, 83, 115, 110, 117, 99, 75, 57, 100, 74, 115, 114, 99, 43, 118, 85, 61, 59, 32, 104, 61, 102, 114, 111, 109, 58, 67, 111, 110, 116, 101, 110, 116, 45, 84, 121, 112, 101, 58, 77, 105, 109, 101, 45, 86, 101, 114, 115, 105, 111, 110, 58, 83, 117, 98, 106, 101, 99, 116, 58, 77, 101, 115, 115, 97, 103, 101, 45, 73, 100, 58, 68, 97, 116, 101, 58, 116, 111, 59, 32, 98, 61
+    ];
+    let header_hash = dep::std::hash::sha256(header);
     let signature: BN2048 = BigNum::from_array(
         [
-        0xf193c3300b7c9902e32861c38d0d2d, 0x9f6927fdb3df0b84092d8459654327, 0x8a0bea5e2fa82821e49c27b68d5a7b, 0xaa8c0acc1190f9fd845ef64f8e7ae9, 0xa7aeebb37f4395965543e6df69a5a7, 0x087ecef9921569cfba83331ca11c6b, 0x4589ed316ed20757e65ad221736011, 0x0835d8748f11dcc985700c3fea27b1, 0xe870d2493fb83b4a1d72350e5de926, 0x268b28eda0aac07625cfab32b60af1, 0xb41a164eae7ba1602eaec5b5a39fe6, 0x693cc5ec578422bee48eabe390fc37, 0xa29504dd504f14423f2ce65b2ac388, 0x6c3ac6310c084a0b126fcd5225c208, 0xab0903e48563e5f4a5365ac5cbd888, 0xf05bf2e5b6266c0ac88dfc733c414f, 0xf58f9e9669e0f4f3086cce1187fd44, 0xb9
+        0x5779c85587e51cb8de5c29d7fdfeb0, 0xcd7ea8b6119f76f117ecb5042f8fc0, 0xeb7ac32b81d5a87bc2046fa0004e27, 0x62708c43b0c07a8fe8bdc97c479138, 0xc1e90d184f22a80be4a484a6ebd462, 0x39f3ff00e47728aaf74802d2d1d07b, 0x0f39de2cf99bf20dab7b8ae9240acd, 0xf4875cb76ce2538f255d70476136d6, 0xde151a5005ca614d6af7dd01e2a083, 0x6fe12b286f3195cae005fd7d2a1766, 0xd6e43a3060eccc555f2ee1e2929932, 0x0d5fa7cc79c794ae80310b491a1b40, 0x9cff415204cbc05c772ede05903440, 0xe7190ccff38575ae70dd055cd892d2, 0xf34bb777c0c842b0e88738eafdf634, 0x21040437e1e945a201ff58e542be68, 0x12f254fa4a0fb776ffe8759eb9eefa, 0x12
     ]
     );
     let instance: BNInstance = BigNumInstance::new(
@@ -113,5 +115,5 @@ fn test_zk_email() {
     ]
     );
     let rsa: RSA2048 = RSA {};
-    assert(rsa.verify_sha256_pkcs1v15(instance, body_hash, signature));
+    assert(rsa.verify_sha256_pkcs1v15(instance, header_hash, signature));
 }

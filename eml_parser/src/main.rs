@@ -1,14 +1,15 @@
 use base64::{engine::general_purpose, Engine as _};
 use eml_parser::{
-    eml::{Eml, HeaderFieldValue},
+    eml::{Eml, HeaderField, HeaderFieldValue},
     EmlParser,
 };
 use regex::Regex;
-use rsa::pkcs1v15::VerifyingKey;
 use rsa::signature::{SignatureEncoding, Signer, Verifier};
 use rsa::{pkcs1::DecodeRsaPublicKey, pkcs8::DecodePublicKey, traits::PublicKeyParts};
 use rsa::{pkcs1v15::Signature, traits::PaddingScheme};
-use sha2::Sha256;
+use rsa::{pkcs1v15::VerifyingKey, Pkcs1v15Encrypt, Pkcs1v15Sign};
+use sha2::{Digest, Sha256};
+use std::hash::Hash;
 use trust_dns_resolver::{config::*, Resolver};
 
 use noir_bignum_paramgen::{bn_limbs, bn_runtime_instance};
@@ -24,9 +25,25 @@ struct DkimHeader {
     signature: Option<String>,
 }
 
+#[derive(Clone, Debug)]
+pub struct RelaxedHeaders {
+    from: String,
+    content_type: String,
+    mime_version: String,
+    subject: String,
+    message_id: String,
+    date: String,
+    to: String,
+    dkim_signature: String,
+}
+
 fn main() {
     // load email from fs
     let eml = get_demo_eml();
+
+    // Parse out the headers of the email
+    let relaxed_headers = build_relaxed_headers(&eml);
+    let signed_headers = to_signed_headers(&relaxed_headers);
 
     // Extract the DKIM-Signature header from the email
     let dkim_header = &eml
@@ -50,17 +67,31 @@ fn main() {
     let public_key = RsaPublicKey::from_public_key_pem(&pem_key).unwrap();
 
     // extract signature
-    let mut signature = parse_dkim_signature(&dkim_header.to_string());
+    let signature = parse_dkim_signature(&dkim_header.to_string());
 
-    // extract body hash
-    let mut body_hash = general_purpose::STANDARD
-        .decode(parsed_header.body_hash.as_ref().unwrap())
-        .unwrap();
+    // println!(
+    //     "Public Key: {:?}",
+    //     hex::encode(public_key.n().to_bytes_be())
+    // );
+    // println!("Signature: {:?}", hex::encode(&signature));
 
+    // // extract body hash
+    // let mut body_hash = general_purpose::STANDARD
+    //     .decode(parsed_header.body_hash.as_ref().unwrap())
+    //     .unwrap();
+
+    // // println!("Body Hash: {:?}", hex::encode(&body_hash));
+    // // println!("Computed Body Hash: {:?}", hex::encode(&body_hash_computed));
+
+    // try_verify_signature(&public_key, &signature, &header_hash);
+
+    // print the header array
+    println!("{}", make_header_string(&signed_headers));
+
+    // print the signature and pubkey format for noir
     generate_2048_bit_signature_parameters(
         &signature,
         &public_key,
-        &body_hash
     );
 }
 
@@ -163,7 +194,6 @@ fn extract_and_format_dkim_public_key(dkim_record: &str) -> Result<String, Box<d
 pub fn generate_2048_bit_signature_parameters(
     signature: &Vec<u8>,
     pubkey: &RsaPublicKey,
-    body_hash: &Vec<u8>,
 ) {
     let sig_bytes = &Signature::try_from(signature.as_slice())
         .unwrap()
@@ -171,7 +201,6 @@ pub fn generate_2048_bit_signature_parameters(
 
     let sig_uint: BigUint = BigUint::from_bytes_be(sig_bytes);
     let sig_str = bn_limbs(sig_uint.clone(), 2048);
-    println!("let body_hash: [u8; 32] = {:?};", body_hash);
     println!(
         "let signature: BN2048 = BigNum::from_array({});",
         sig_str.as_str()
@@ -196,15 +225,90 @@ fn clean_dkim_signature(dkim_signature: &str) -> String {
     dkim_signature.replace(&['\t', '\r', '\n', ' '][..], "")
 }
 
-// pub fn try_verify_signature(
-//     pubkey: &RsaPublicKey,
-//     signature: &Vec<u8>,
-//     body_hash: &Vec<u8>,
-// ) -> bool {
-//     let verified = pubkey.verify(
+pub fn try_verify_signature(
+    pubkey: &RsaPublicKey,
+    signature: &Vec<u8>,
+    body_hash: &Vec<u8>,
+) -> bool {
+    let verified = pubkey.verify(Pkcs1v15Sign::new_unprefixed(), &body_hash, &signature);
+    println!("Verified: {:?}", verified);
+    verified.is_ok()
+}
 
-//         &body_hash,
-//         &signature,
-//     );
-//     false
-// }
+pub fn build_relaxed_headers(eml: &Eml) -> RelaxedHeaders {
+    let headers = &eml.headers;
+    let subject = eml.subject.clone().unwrap();
+    let from = headers
+        .iter()
+        .find(|header| header.name == "from")
+        .unwrap()
+        .value
+        .to_string();
+    let content_type = headers
+        .iter()
+        .find(|header| header.name == "Content-Type")
+        .unwrap()
+        .value
+        .to_string();
+    let mime_version = headers
+        .iter()
+        .find(|header| header.name == "Mime-Version")
+        .unwrap()
+        .value
+        .to_string();
+    let message_id = headers
+        .iter()
+        .find(|header| header.name == "Message-Id")
+        .unwrap()
+        .value
+        .to_string();
+    let date = headers
+        .iter()
+        .find(|header| header.name == "Date")
+        .unwrap()
+        .value
+        .to_string();
+    let to = headers
+        .iter()
+        .find(|header| header.name == "to")
+        .unwrap()
+        .value
+        .to_string();
+    let dkim_signature = headers
+        .iter()
+        .find(|header| header.name == "DKIM-Signature")
+        .unwrap()
+        .value
+        .to_string();
+    // remove signature from dkim field
+    let b_index = dkim_signature.find("; b=").expect("Invalid DKIM signature format");
+    let dkim_signature = String::from(&dkim_signature[..b_index + 4]); // Include the '; b=' part
+    return RelaxedHeaders {
+        from,
+        content_type,
+        mime_version,
+        subject,
+        message_id,
+        date,
+        to,
+        dkim_signature,
+    };
+}
+
+pub fn to_signed_headers(relaxed_headers: &RelaxedHeaders) -> Vec<u8> {
+    let headers = vec![
+        format!("from:{}", relaxed_headers.from.clone()),
+        format!("content-type:{}", relaxed_headers.content_type.clone()),
+        format!("mime-version:{}", relaxed_headers.mime_version.clone()),
+        format!("subject:{}", relaxed_headers.subject.clone()),
+        format!("message-id:{}", relaxed_headers.message_id.clone()),
+        format!("date:{}", relaxed_headers.date.clone()),
+        format!("to:{}", relaxed_headers.to.clone()),
+        format!("dkim-signature:{}", relaxed_headers.dkim_signature.clone()),
+    ];
+    headers.join("\r\n").as_bytes().to_vec()
+}
+
+pub fn make_header_string(header: &Vec<u8>) -> String {
+    format!("let header: [u8; {}] = {:?};", header.len(), header)
+}

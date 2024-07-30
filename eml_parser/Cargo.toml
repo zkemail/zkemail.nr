@@ -9,7 +9,7 @@ eml-parser = "0.1.4"
 hex = "0.4.3"
 pem = "3.0.4"
 regex = "1.10.5"
-rsa = "0.9.6"
+rsa = { version = "0.9.6", features = ["sha2"] }
 trust-dns-resolver = "0.23.2"
 noir-bignum-paramgen = { version = "0.1.2" }
 num-bigint = { version = "0.8.2", features = ["i128", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
