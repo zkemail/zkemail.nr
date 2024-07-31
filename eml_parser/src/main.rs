@@ -100,7 +100,7 @@ fn main() {
 
 fn get_demo_eml() -> Eml {
     let current_dir = std::env::current_dir().unwrap();
-    let filepath = current_dir.join("src").join("demo-diff-domain.eml");
+    let filepath = current_dir.join("src").join("demo.eml");
     EmlParser::from_file(filepath.to_str().unwrap())
         .unwrap()
         .parse()
