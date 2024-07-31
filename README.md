@@ -31,7 +31,7 @@ global EMAIL_BODY_LENGTH: u32 = 24;
 
 Note that this is a very rough version of this utility and the rust is not built to be maintainable yet.
 
--[x] CLI for turning .eml into inputs for Noir (printed)
+- [x] CLI for .eml parsing into noir inputs
 - [x] Prover.toml generation script
 - [ ] Ensure works on all valid test cases in https://github.com/zkemail/zk-email-verify/tree/main/packages/circuits/tests/test-emails
 - [x] Full body hash
@@ -39,6 +39,7 @@ Note that this is a very rough version of this utility and the rust is not built
 - [ ] Prove to, from, etc. using string search
 - [ ] CLI takes input to specific .eml file rather than hardcoded
 - [ ] Max body and header length rather than hardcoded
+- [ ] Simple body/ header parsing (currently uses relaxed by default)
 - [ ] Proving
 - [ ] Benchmarks
 

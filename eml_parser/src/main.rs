@@ -3,23 +3,14 @@ use eml_parser::{
     eml::{Eml, HeaderField, HeaderFieldValue},
     EmlParser,
 };
-use regex::Regex;
-use rsa::signature::{SignatureEncoding, Signer, Verifier};
-use rsa::{pkcs1::DecodeRsaPublicKey, pkcs8::DecodePublicKey, traits::PublicKeyParts};
-use rsa::{pkcs1v15::Signature, traits::PaddingScheme};
-use rsa::{pkcs1v15::VerifyingKey, Pkcs1v15Encrypt, Pkcs1v15Sign};
-use sha2::{Digest, Sha256};
-use std::fs::write;
-use std::hash::Hash;
-use trust_dns_resolver::{config::*, Resolver};
-
-use noir_bignum_paramgen::{
-    bignum_from_string, bn_limbs, bn_runtime_instance, compute_barrett_reduction_parameter,
-    redc_limbs, split_into_120_bit_limbs,
-};
+use noir_bignum_paramgen::{bn_limbs, redc_limbs};
 use num_bigint::BigUint;
+use regex::Regex;
 use rsa::RsaPublicKey;
+use rsa::{pkcs8::DecodePublicKey, traits::PublicKeyParts};
 use std::error::Error;
+use std::fs::write;
+use trust_dns_resolver::{proto::op::header, Resolver};
 
 #[derive(Clone, Debug)]
 struct DkimHeader {
@@ -48,6 +39,7 @@ fn main() {
     // Parse out the headers of the email
     let relaxed_headers = build_relaxed_headers(&eml);
     let signed_headers = to_signed_headers(&relaxed_headers);
+    println!("signed headers: {:?}", hex::encode(&signed_headers));
 
     // Extract the DKIM-Signature header from the email
     let dkim_header = &eml
@@ -59,6 +51,7 @@ fn main() {
 
     // Parse the needed fields
     let parsed_header = parse_dkim_header(dkim_header);
+    println!("{:?}", parsed_header);
 
     // Query the DNS for the DKIM public key
     let dkim_record = query_dkim_public_key(
@@ -81,26 +74,12 @@ fn main() {
         .as_bytes()
         .to_vec();
     let body_hash_index = find_body_hash_index(&signed_headers, &body_hash);
-    // println!("body_hash: {:?}", &body_hash);
-    let decoded_body_hash = general_purpose::STANDARD.decode(body_hash.clone()).unwrap();
-    // println!("decoded_body_hash: {:?}", decoded_body_hash);
 
     // get the body
     let mut body = eml.body.clone().unwrap().as_bytes().to_vec();
-    // format body for MIME CLRF
+
     fix_newlines(&mut body);
-    // println!("body: {:?}", hex::encode(&body));
-
-    let mut hasher = Sha256::new();
-    hasher.update(&body);
-    let body_hash = hasher.finalize().to_vec();
-    // println!("Expected Body Hash: {:?}", body_hash);
-
-    // print the signature and pubkey format for noir
-    // generate_2048_bit_signature_parameters(
-    //     &signature,
-    //     &public_key,
-    // );
+    println!("body: {:?}", hex::encode(&body));
 
     // build the prover.toml file
     build_prover_toml(
@@ -121,7 +100,7 @@ fn main() {
 
 fn get_demo_eml() -> Eml {
     let current_dir = std::env::current_dir().unwrap();
-    let filepath = current_dir.join("src").join("demo.eml");
+    let filepath = current_dir.join("src").join("demo-diff-domain.eml");
     EmlParser::from_file(filepath.to_str().unwrap())
         .unwrap()
         .parse()
@@ -199,21 +178,6 @@ fn extract_and_format_dkim_public_key(dkim_record: &str) -> Result<String, Box<d
     Ok(pem_key)
 }
 
-pub fn generate_2048_bit_signature_parameters(signature: &Vec<u8>, pubkey: &RsaPublicKey) {
-    let sig_bytes = &Signature::try_from(signature.as_slice())
-        .unwrap()
-        .to_bytes();
-
-    let sig_uint: BigUint = BigUint::from_bytes_be(sig_bytes);
-    let sig_str = bn_limbs(sig_uint.clone(), 2048);
-    println!(
-        "let signature: BN2048 = BigNum::from_array({});",
-        sig_str.as_str()
-    );
-    let r = bn_runtime_instance(pubkey.n().clone(), 2048, String::from("instance"));
-    println!("{}", r.as_str());
-}
-
 fn parse_dkim_signature(dkim_header: &str) -> Vec<u8> {
     let b64 = extract_dkim_signature(dkim_header);
     general_purpose::STANDARD.decode(b64).unwrap()
@@ -276,10 +240,22 @@ pub fn build_relaxed_headers(eml: &Eml) -> RelaxedHeaders {
         .value
         .to_string();
     // remove signature from dkim field
-    let b_index = dkim_signature
-        .find("; b=")
-        .expect("Invalid DKIM signature format");
-    let dkim_signature = String::from(&dkim_signature[..b_index + 4]); // Include the '; b=' part
+    let patterns = ["; b=", ";\n\tb="];
+    let result = patterns
+        .iter()
+        .enumerate() // Add the index of the pattern
+        .filter_map(|(pattern_index, &pattern)| {
+            dkim_signature
+                .find(pattern)
+                .map(|index| (pattern_index, index))
+        })
+        .min_by_key(|&(_, index)| index);
+
+    let (b_index, offset) = match result {
+        Some((offset, b_index)) => (b_index, offset),
+        None => panic!("Failed to find the signature in the DKIM-Signature header"),
+    };
+    let dkim_signature = String::from(&dkim_signature[..b_index + 4 + offset]); // Include the '; b=' part
     return RelaxedHeaders {
         from,
         content_type,
@@ -303,7 +279,9 @@ pub fn to_signed_headers(relaxed_headers: &RelaxedHeaders) -> Vec<u8> {
         format!("to:{}", relaxed_headers.to.clone()),
         format!("dkim-signature:{}", relaxed_headers.dkim_signature.clone()),
     ];
-    headers.join("\r\n").as_bytes().to_vec()
+    let header_str = headers.join("\r\n");
+    let header_str = header_str.replace("\n\t", " ");
+    header_str.as_bytes().to_vec()
 }
 
 pub fn make_header_string(header: &Vec<u8>) -> String {
@@ -330,6 +308,16 @@ fn fix_newlines(bytes: &mut Vec<u8>) {
         i += 1;
     }
     bytes.append(&mut vec![0x0D, 0x0A]);
+    let mut index = bytes.len() - 2;
+    let mut found = true;
+    while (found) {
+        if bytes[index] == 0x0D && bytes[index + 1] == 0x0A {
+            index -= 2;
+        } else {
+            found = false;
+        }
+    }
+    bytes.truncate(index + 4);
 }
 
 pub fn build_prover_toml(
