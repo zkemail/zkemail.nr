@@ -1,4 +1,4 @@
-use crate::BODY_HASH_BASE64_LENGTH;
+use crate::{BODY_HASH_BASE64_LENGTH, EMAIL_HEADER_LENGTH};
 
 // https://github.com/richardliang/noir-rsa/blob/main/crates/rsa-biguint/src/lib.nr
 
@@ -45,4 +45,12 @@ fn base64_lookup(input: u8) -> u8 {
         // =
         0
     }
+}
+
+pub fn get_body_hash(header: [u8; EMAIL_HEADER_LENGTH], index: u32) -> [u8; BODY_HASH_BASE64_LENGTH] {
+    let mut body_hash = [0 as u8; BODY_HASH_BASE64_LENGTH];
+    for i in 0..BODY_HASH_BASE64_LENGTH {
+        body_hash[i] = header[index + i];
+    }
+    body_hash
 }

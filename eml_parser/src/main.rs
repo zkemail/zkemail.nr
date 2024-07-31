@@ -112,7 +112,10 @@ fn main() {
     );
 
     // print lengths
-    println!("global EMAIL_HEADER_LENGTH: u32 = {};", signed_headers.len());
+    println!(
+        "global EMAIL_HEADER_LENGTH: u32 = {};",
+        signed_headers.len()
+    );
     println!("global EMAIL_BODY_LENGTH: u32 = {};", body.len());
 }
 
@@ -342,22 +345,24 @@ pub fn build_prover_toml(
     let header = format!("header = {:?}", header);
     // make the body value
     let body = format!("body = {:?}", body);
-    // make the signature value
-    let sig_limbs = bn_limbs(BigUint::from_bytes_be(signature), 2048);
-    let signature = format!("[signature]\nlimbs = {}", sig_limbs);
     // make the pubkey_modulus value
     let pubkey_modulus = format!(
         "pubkey_modulus_limbs = {}",
-        bn_limbs(public_key.n().clone(), 2048)
+        quote_hex(bn_limbs(public_key.n().clone(), 2048))
     );
-
     // make the reduction parameter for the pubkey
-    let redc_params = format!("redc_params_limbs = {}", redc_limbs(public_key.n().clone(), 2048));
+    let redc_params = format!(
+        "redc_params_limbs = {}",
+        quote_hex(redc_limbs(public_key.n().clone(), 2048))
+    );
+    // make the signature value
+    let sig_limbs = bn_limbs(BigUint::from_bytes_be(signature), 2048);
+    let signature = format!("[signature]\nlimbs = {}", quote_hex(sig_limbs));
 
     // format for toml content
     let toml_content = format!(
         "{}\n\n{}\n\n{}\n\n{}\n\n{}\n\n{}",
-        body_hash_index, header, body, signature, pubkey_modulus, redc_params
+        body_hash_index, header, body, pubkey_modulus, redc_params, signature
     );
 
     // save to fs
@@ -366,8 +371,14 @@ pub fn build_prover_toml(
     write(file_path, toml_content).expect("Failed to write to Prover.toml");
 }
 
-// pub fn make_modulus_limbs(public_key: &RsaPublicKey) -> String {
-//     let modulus = public_key.n();
-//     let modulus_limbs = split_into_120_bit_limbs(modulus, 2048);
-
-// }
+pub fn quote_hex(input: String) -> String {
+    let hex_values: Vec<&str> = input
+        .trim_matches(|c| c == '[' || c == ']')
+        .split(", ")
+        .collect();
+    let quoted_hex_values: Vec<String> = hex_values
+        .iter()
+        .map(|&value| format!("\"{}\"", value))
+        .collect();
+    format!("[{}]", quoted_hex_values.join(", "))
+}
