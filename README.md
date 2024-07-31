@@ -46,3 +46,8 @@ Note that this is a very rough version of this utility and the rust is not built
 [ ] Partial body hash
 [ ] Find to, from, etc demo
 [ ] CLI takes input to specific .eml file rather than hardcoded
+
+## Credits
+[ZK Email](https://github.com/zkemail) - repo is derived entirely from this work
+[Noir_RSA (V2)](https://github.com/noir_lang/noir_rsa) - Makes ZKEmail possible in reasonable amount of time in Noir
+[Noir-RSA (V1)](https://github.com/richardliang/noir-rsa/) - base64, insights into how to implement 

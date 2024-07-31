@@ -9,10 +9,14 @@ use rsa::{pkcs1::DecodeRsaPublicKey, pkcs8::DecodePublicKey, traits::PublicKeyPa
 use rsa::{pkcs1v15::Signature, traits::PaddingScheme};
 use rsa::{pkcs1v15::VerifyingKey, Pkcs1v15Encrypt, Pkcs1v15Sign};
 use sha2::{Digest, Sha256};
+use std::fs::write;
 use std::hash::Hash;
 use trust_dns_resolver::{config::*, Resolver};
 
-use noir_bignum_paramgen::{bn_limbs, bn_runtime_instance};
+use noir_bignum_paramgen::{
+    bignum_from_string, bn_limbs, bn_runtime_instance, compute_barrett_reduction_parameter,
+    redc_limbs, split_into_120_bit_limbs,
+};
 use num_bigint::BigUint;
 use rsa::RsaPublicKey;
 use std::error::Error;
@@ -69,14 +73,47 @@ fn main() {
     // extract signature
     let signature = parse_dkim_signature(&dkim_header.to_string());
 
-    // print the header array
-    println!("{}", make_header_string(&signed_headers));
+    // find the body hash index
+    let body_hash = parsed_header
+        .body_hash
+        .as_ref()
+        .unwrap()
+        .as_bytes()
+        .to_vec();
+    let body_hash_index = find_body_hash_index(&signed_headers, &body_hash);
+    // println!("body_hash: {:?}", &body_hash);
+    let decoded_body_hash = general_purpose::STANDARD.decode(body_hash.clone()).unwrap();
+    // println!("decoded_body_hash: {:?}", decoded_body_hash);
+
+    // get the body
+    let mut body = eml.body.clone().unwrap().as_bytes().to_vec();
+    // format body for MIME CLRF
+    fix_newlines(&mut body);
+    // println!("body: {:?}", hex::encode(&body));
+
+    let mut hasher = Sha256::new();
+    hasher.update(&body);
+    let body_hash = hasher.finalize().to_vec();
+    // println!("Expected Body Hash: {:?}", body_hash);
 
     // print the signature and pubkey format for noir
-    generate_2048_bit_signature_parameters(
+    // generate_2048_bit_signature_parameters(
+    //     &signature,
+    //     &public_key,
+    // );
+
+    // build the prover.toml file
+    build_prover_toml(
+        &signed_headers,
+        &body,
+        body_hash_index,
         &signature,
         &public_key,
     );
+
+    // print lengths
+    println!("global EMAIL_HEADER_LENGTH: u32 = {};", signed_headers.len());
+    println!("global EMAIL_BODY_LENGTH: u32 = {};", body.len());
 }
 
 fn get_demo_eml() -> Eml {
@@ -159,10 +196,7 @@ fn extract_and_format_dkim_public_key(dkim_record: &str) -> Result<String, Box<d
     Ok(pem_key)
 }
 
-pub fn generate_2048_bit_signature_parameters(
-    signature: &Vec<u8>,
-    pubkey: &RsaPublicKey,
-) {
+pub fn generate_2048_bit_signature_parameters(signature: &Vec<u8>, pubkey: &RsaPublicKey) {
     let sig_bytes = &Signature::try_from(signature.as_slice())
         .unwrap()
         .to_bytes();
@@ -239,7 +273,9 @@ pub fn build_relaxed_headers(eml: &Eml) -> RelaxedHeaders {
         .value
         .to_string();
     // remove signature from dkim field
-    let b_index = dkim_signature.find("; b=").expect("Invalid DKIM signature format");
+    let b_index = dkim_signature
+        .find("; b=")
+        .expect("Invalid DKIM signature format");
     let dkim_signature = String::from(&dkim_signature[..b_index + 4]); // Include the '; b=' part
     return RelaxedHeaders {
         from,
@@ -270,3 +306,68 @@ pub fn to_signed_headers(relaxed_headers: &RelaxedHeaders) -> Vec<u8> {
 pub fn make_header_string(header: &Vec<u8>) -> String {
     format!("let header: [u8; {}] = {:?};", header.len(), header)
 }
+
+pub fn find_body_hash_index(signed_headers: &Vec<u8>, body_hash: &Vec<u8>) -> u32 {
+    signed_headers
+        .windows(body_hash.len())
+        .position(|window| window == body_hash)
+        .unwrap() as u32
+}
+
+fn fix_newlines(bytes: &mut Vec<u8>) {
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == 0x0A {
+            if i == 0 || bytes[i - 1] != 0x0D {
+                // Insert 0x0D before 0x0A
+                bytes.insert(i, 0x0D);
+                i += 1; // Move past the inserted 0x0D
+            }
+        }
+        i += 1;
+    }
+    bytes.append(&mut vec![0x0D, 0x0A]);
+}
+
+pub fn build_prover_toml(
+    header: &Vec<u8>,
+    body: &Vec<u8>,
+    body_hash_index: u32,
+    signature: &Vec<u8>,
+    public_key: &RsaPublicKey,
+) {
+    // make the body_hash_index value
+    let body_hash_index = format!("body_hash_index = {}", body_hash_index);
+    // make the header value
+    let header = format!("header = {:?}", header);
+    // make the body value
+    let body = format!("body = {:?}", body);
+    // make the signature value
+    let sig_limbs = bn_limbs(BigUint::from_bytes_be(signature), 2048);
+    let signature = format!("[signature]\nlimbs = {}", sig_limbs);
+    // make the pubkey_modulus value
+    let pubkey_modulus = format!(
+        "pubkey_modulus_limbs = {}",
+        bn_limbs(public_key.n().clone(), 2048)
+    );
+
+    // make the reduction parameter for the pubkey
+    let redc_params = format!("redc_params_limbs = {}", redc_limbs(public_key.n().clone(), 2048));
+
+    // format for toml content
+    let toml_content = format!(
+        "{}\n\n{}\n\n{}\n\n{}\n\n{}\n\n{}",
+        body_hash_index, header, body, signature, pubkey_modulus, redc_params
+    );
+
+    // save to fs
+    let current_dir = std::env::current_dir().expect("Failed to get current directory");
+    let file_path = current_dir.join("..").join("Prover.toml");
+    write(file_path, toml_content).expect("Failed to write to Prover.toml");
+}
+
+// pub fn make_modulus_limbs(public_key: &RsaPublicKey) -> String {
+//     let modulus = public_key.n();
+//     let modulus_limbs = split_into_120_bit_limbs(modulus, 2048);
+
+// }
