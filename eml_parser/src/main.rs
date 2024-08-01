@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose, Engine as _};
 use eml_parser::{
-    eml::{Eml, HeaderField, HeaderFieldValue},
+    eml::{Eml, HeaderFieldValue},
     EmlParser,
 };
 use noir_bignum_paramgen::{bn_limbs, redc_limbs};
@@ -10,14 +10,15 @@ use rsa::RsaPublicKey;
 use rsa::{pkcs8::DecodePublicKey, traits::PublicKeyParts};
 use std::error::Error;
 use std::fs::write;
-use trust_dns_resolver::{proto::op::header, Resolver};
+use trust_dns_resolver::Resolver;
+
+const MAX_ADDRESS_LOCAL_LENGTH: usize = 64;
 
 #[derive(Clone, Debug)]
 struct DkimHeader {
     selector: Option<String>,
     domain: Option<String>,
     body_hash: Option<String>,
-    signature: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -39,7 +40,6 @@ fn main() {
     // Parse out the headers of the email
     let relaxed_headers = build_relaxed_headers(&eml);
     let signed_headers = to_signed_headers(&relaxed_headers);
-    println!("signed headers: {:?}", hex::encode(&signed_headers));
 
     // Extract the DKIM-Signature header from the email
     let dkim_header = &eml
@@ -51,7 +51,6 @@ fn main() {
 
     // Parse the needed fields
     let parsed_header = parse_dkim_header(dkim_header);
-    println!("{:?}", parsed_header);
 
     // Query the DNS for the DKIM public key
     let dkim_record = query_dkim_public_key(
@@ -64,7 +63,7 @@ fn main() {
     let public_key = RsaPublicKey::from_public_key_pem(&pem_key).unwrap();
 
     // extract signature
-    let signature = parse_dkim_signature(&dkim_header.to_string());
+    let signature = extract_dkim_signature(&dkim_header.to_string());
 
     // find the body hash index
     let body_hash = parsed_header
@@ -77,9 +76,10 @@ fn main() {
 
     // get the body
     let mut body = eml.body.clone().unwrap().as_bytes().to_vec();
+    fix_body_newlines(&mut body);
 
-    fix_newlines(&mut body);
-    println!("body: {:?}", hex::encode(&body));
+    // get the padded recipient address local part + length
+    let (padded_recipient_local, recipient_local_len) = get_padded_recipient_local(&eml);
 
     // build the prover.toml file
     build_prover_toml(
@@ -88,6 +88,8 @@ fn main() {
         body_hash_index,
         &signature,
         &public_key,
+        &padded_recipient_local,
+        recipient_local_len,
     );
 
     // print lengths
@@ -109,14 +111,13 @@ fn get_demo_eml() -> Eml {
 
 fn parse_dkim_header(dkim_header: &HeaderFieldValue) -> DkimHeader {
     let value = dkim_header.to_string();
-    let bh_regex = Regex::new(r"bh=([^;]+);").unwrap();
-    let b_regex = Regex::new(r"b=([^;]+)").unwrap();
-    let s_regex = Regex::new(r"s=([^;]+);").unwrap();
-    let d_regex = Regex::new(r"d=([^;]+);").unwrap();
+    let regex_str = r"=([^;]+);";
+    let bh_regex = Regex::new(&format!("bh{}", regex_str)).unwrap();
+    let s_regex = Regex::new(&format!("s{}", regex_str)).unwrap();
+    let d_regex = Regex::new(&format!("d{}", regex_str)).unwrap();
     let s = s_regex
         .captures(&value)
         .and_then(|caps| caps.get(1).map(|m| m.as_str().to_string()));
-
     let d = d_regex
         .captures(&value)
         .and_then(|caps| caps.get(1).map(|m| m.as_str().to_string()));
@@ -124,16 +125,15 @@ fn parse_dkim_header(dkim_header: &HeaderFieldValue) -> DkimHeader {
     let bh = bh_regex
         .captures(&value)
         .and_then(|caps| caps.get(1).map(|m| m.as_str().to_string()));
-    let b = b_regex.captures(&value).and_then(|caps| {
-        caps.get(1)
-            .map(|m| m.as_str().replace("\r\n", "").replace(" ", ""))
-    });
+    // let b = b_regex.captures(&value).and_then(|caps| {
+    //     caps.get(1)
+    //         .map(|m| m.as_str().replace("\r\n", "").replace(" ", ""))
+    // });
 
     DkimHeader {
         selector: s,
         domain: d,
         body_hash: bh,
-        signature: b,
     }
 }
 
@@ -178,16 +178,13 @@ fn extract_and_format_dkim_public_key(dkim_record: &str) -> Result<String, Box<d
     Ok(pem_key)
 }
 
-fn parse_dkim_signature(dkim_header: &str) -> Vec<u8> {
-    let b64 = extract_dkim_signature(dkim_header);
-    general_purpose::STANDARD.decode(b64).unwrap()
-}
-
-fn extract_dkim_signature(dkim_header: &str) -> String {
+fn extract_dkim_signature(dkim_header: &str) -> Vec<u8> {
     let re = Regex::new(r"b=([^;]+)").unwrap();
-    re.captures(dkim_header)
+    let encoded_signature = re
+        .captures(dkim_header)
         .and_then(|caps| caps.get(1).map(|m| clean_dkim_signature(m.as_str())))
-        .unwrap()
+        .unwrap();
+    general_purpose::STANDARD.decode(encoded_signature).unwrap()
 }
 
 fn clean_dkim_signature(dkim_signature: &str) -> String {
@@ -295,7 +292,7 @@ pub fn find_body_hash_index(signed_headers: &Vec<u8>, body_hash: &Vec<u8>) -> u3
         .unwrap() as u32
 }
 
-fn fix_newlines(bytes: &mut Vec<u8>) {
+fn fix_body_newlines(bytes: &mut Vec<u8>) {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == 0x0A {
@@ -310,7 +307,7 @@ fn fix_newlines(bytes: &mut Vec<u8>) {
     bytes.append(&mut vec![0x0D, 0x0A]);
     let mut index = bytes.len() - 2;
     let mut found = true;
-    while (found) {
+    while found {
         if bytes[index] == 0x0D && bytes[index + 1] == 0x0A {
             index -= 2;
         } else {
@@ -326,6 +323,8 @@ pub fn build_prover_toml(
     body_hash_index: u32,
     signature: &Vec<u8>,
     public_key: &RsaPublicKey,
+    padded_recipient_local: &Vec<u8>,
+    recipient_local_len: u32,
 ) {
     // make the body_hash_index value
     let body_hash_index = format!("body_hash_index = {}", body_hash_index);
@@ -343,14 +342,24 @@ pub fn build_prover_toml(
         "redc_params_limbs = {}",
         quote_hex(redc_limbs(public_key.n().clone(), 2048))
     );
+    // make the recipient local part
+    let padded_recipient_local = format!("padded_recipient_local = {:?}", padded_recipient_local);
+    let recipient_local_len = format!("recipient_local_length = {}", recipient_local_len);
     // make the signature value
     let sig_limbs = bn_limbs(BigUint::from_bytes_be(signature), 2048);
     let signature = format!("[signature]\nlimbs = {}", quote_hex(sig_limbs));
 
     // format for toml content
     let toml_content = format!(
-        "{}\n\n{}\n\n{}\n\n{}\n\n{}\n\n{}",
-        body_hash_index, header, body, pubkey_modulus, redc_params, signature
+        "{}\n\n{}\n\n{}\n\n{}\n\n{}\n\n{}\n\n{}\n\n{}",
+        body_hash_index,
+        header,
+        body,
+        pubkey_modulus,
+        redc_params,
+        padded_recipient_local,
+        recipient_local_len,
+        signature
     );
 
     // save to fs
@@ -369,4 +378,28 @@ pub fn quote_hex(input: String) -> String {
         .map(|&value| format!("\"{}\"", value))
         .collect();
     format!("[{}]", quoted_hex_values.join(", "))
+}
+
+pub fn get_padded_recipient_local(eml: &Eml) -> (Vec<u8>, u32) {
+    // find the header with the recipient email address
+    let recipient = eml
+        .headers
+        .iter()
+        .find(|header| header.name == "to")
+        .unwrap()
+        .value
+        .to_string();
+    // parse out the local part of the email address
+    let re = Regex::new(r"^([^@]+)@").unwrap();
+    let local = re.captures(&recipient).unwrap().get(1).unwrap().as_str();
+    let mut local_bytes = local.as_bytes().to_vec();
+    local_bytes.resize(MAX_ADDRESS_LOCAL_LENGTH, 0);
+    // let recipient = recipient.replace("<", "").replace(">", "");
+    // let recipient = recipient.split("@").collect::<Vec<&str>>()[0];
+    // let recipient = recipient.as_bytes();
+    // let mut padded_recipient = vec![0u8; 64];
+    // let recipient_len = recipient.len() as u32;
+    // padded_recipient[..recipient.len()].copy_from_slice(recipient);
+    // (padded_recipient, recipient_len)
+    (local_bytes, local.len() as u32)
 }
