@@ -5,6 +5,7 @@ Library for proving emails in Noir. Use the EML parser to generate a Prover.toml
 2. Extracts the body hash from the authenticated body header
 3. Authenticates a body that is hashed in circuit as matching the body hash in the header
 4. Asserts the email is received by a specified domain (gmail.com as demo)
+5. Outputs the pedersen hash of the DKIM pubkey modulus for verification
 
 See [credits](#credits)
 
@@ -41,9 +42,7 @@ global EMAIL_BODY_LENGTH: u32 = 24;
 ```
 3. Shown above are outputs for exact header and body lengths for the emails. Eventually, a max size for each can be provided, but in the meantime, you must replace these in `main.nr`
 
-4. If you want to use string search, there is a current instability with bb that prevents the prover from running with the string search :( so run nargo test with the test enabled.
-
-5. If you want to actually prove, you must remove the string search parameters from the main function and comment out their use.
+4. Prove the circuit and verify the authenticity of an email:
 ```console
 # Prove with ultraplonk (verifier-contract friendly)
 ./prove_ultraplonk.sh
@@ -59,7 +58,7 @@ Note that the proving is broken with string search due to instability around bb 
 ### Gates
 (NO PARTIAL HASH, MATCHING RECIPIENT DOMAIN)
 
-SMALL EMAIL GATES: `80125`
+SMALL EMAIL GATES: `80125` + 16k gates to hash pubkey modulus
 
 BIG EMAIL GATES: TODO
 
