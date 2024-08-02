@@ -84,7 +84,7 @@ Note that this is a very rough version of this utility and the rust is not built
 
 - [x] CLI for .eml parsing into noir inputs
 - [x] Prover.toml generation script
-- [ ] Ensure works on all valid test cases in https://github.com/zkemail/zk-email-verify/tree/main/packages/circuits/tests/test-emails
+- [ ] Ensure works with big email (Quoted Pritable Encoding) support
 - [x] Full body hash
 - [ ] Partial body hash
 - [x] Prove recipient using string search
@@ -94,7 +94,7 @@ Note that this is a very rough version of this utility and the rust is not built
 - [x] Proving
 - [x] Basic Benchmarking script
 - [ ] Robust Benchmarking script (30 samples)
-- [ ] Publicly output the pubkey modulus to verify the email authenticity
+- [x] Publicly output the pubkey modulus to verify the email authenticity
   [ ] EVM Contract Demo
   [ ] Aztec Contract Demo
   [ ] Hyle Aggregator Demo
