@@ -96,6 +96,9 @@ Note that this is a very rough version of this utility and the rust is not built
 - [x] Basic Benchmarking script
 - [ ] Robust Benchmarking script (30 samples)
 - [ ] Publicly output the pubkey modulus to verify the email authenticity
+  [ ] EVM Contract Demo
+  [ ] Aztec Contract Demo
+  [ ] Hyle Aggregator Demo
 
 ## Credits
 [ZK Email](https://github.com/zkemail) - repo is derived entirely from this work

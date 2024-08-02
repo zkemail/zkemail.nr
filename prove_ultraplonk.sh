@@ -26,8 +26,6 @@ echo "Proving with MegaHonk..."
 
 ## Generate the proof
 bb prove -b ./target/noir_zkemail.json -w ./target/witness.gz -o ./target/proof
-
-## Log the time taken to generate the proof
 end_time=$($date_cmd +%s%N)
 duration_prover=$((end_time - witness_end))
 duration_total=$((end_time - start_time))
@@ -35,6 +33,7 @@ prover_seconds=$(echo "$duration_prover / 1000000000" | bc -l)
 total_seconds=$(echo "$duration_total / 1000000000" | bc -l)
 echo "Proof generated in: $prover_seconds seconds"
 echo "Total time: $total_seconds seconds"
+
 
 
 

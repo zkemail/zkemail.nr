@@ -26,8 +26,6 @@ echo "Proving with MegaHonk..."
 
 ## Generate the proof
 bb prove_mega_honk -b ./target/noir_zkemail.json -w ./target/witness.gz -o ./target/proof
-
-## Log the time taken to generate the proof
 end_time=$($date_cmd +%s%N)
 duration_prover=$((end_time - witness_end))
 duration_total=$((end_time - start_time))
