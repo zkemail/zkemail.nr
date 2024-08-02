@@ -2,7 +2,7 @@ use dep::noir_rsa::bignum::BigNum;
 use dep::noir_rsa::bignum::runtime_bignum::BigNumInstance;
 use dep::noir_rsa::bignum::fields::Params2048;
 use dep::noir_rsa::RSA;
-use dep::std::hash::sha256;
+use dep::std::hash::{sha256, pedersen_hash};
 use dep::string_search::{StringBody, SubString, StringBody512, SubString32, SubString64};
 
 mod utils;
@@ -11,13 +11,11 @@ type BN2048 = BigNum<18, Params2048>;
 type RSA2048 = RSA<BN2048, BigNumInstance<18, Params2048>, 256>;
 
 global BODY_HASH_BASE64_LENGTH: u32 = 44;
-// global EMAIL_HEADER_LENGTH: u32 = 470;
-// global EMAIL_BODY_LENGTH: u32 = 744;
 global EMAIL_HEADER_LENGTH: u32 = 472;
 global EMAIL_BODY_LENGTH: u32 = 24;
 global MAX_ADDRESS_LOCAL_LENGTH = 64; // the max part before @ in the email address
-global TO_DOMAIN_LENGTH: u32 = 9;
-global TO_DOMAIN: [u8; TO_DOMAIN_LENGTH] = "gmail.com".as_bytes(); // example of string search
+global TO_DOMAIN_LENGTH: u32 = 10;
+global TO_DOMAIN: [u8; TO_DOMAIN_LENGTH] = "@gmail.com".as_bytes(); // example of string search
 
 fn main(
     body_hash_index: u32,
@@ -28,14 +26,15 @@ fn main(
     signature: BN2048,
     padded_recipient_local: [u8; MAX_ADDRESS_LOCAL_LENGTH],
     recipient_local_length: u32
-) {
+) -> pub Field {
     // instantiate the BNInstance for the pubkey
     let pubkey: BigNumInstance<18, Params2048> = BigNumInstance::new(pubkey_modulus_limbs, redc_params_limbs);
 
     // hash the header
     let header_hash: [u8; 32] = sha256(header);
 
-    // verify the DKIM signature over the header
+    // print(header_hash);
+    // // verify the DKIM signature over the header
     let rsa: RSA2048 = RSA {};
     assert(rsa.verify_sha256_pkcs1v15(pubkey, header_hash, signature));
 
@@ -54,9 +53,14 @@ fn main(
     // string search for the asserted recipient domain
     let (found, index) = utils::find_to_index(header, padded_recipient_local, recipient_local_length);
     assert(found);
+
     // extract the recipient domain
     let recipient_domain = utils::extract_expected_recipient_domain(header, recipient_local_length, index);
-    println(recipient_domain);
+    assert(recipient_domain == TO_DOMAIN);
+
+    // hash the pubkey modulus to get a single field element for pub output
+    // @notice: if your usecase does not need to minimize verifier work, just emit all limbs to save 16k gates
+    pedersen_hash(pubkey_modulus_limbs)
 }
 
 #[test]
@@ -90,7 +94,7 @@ fn test_zkemail() {
         0xa48a824e4ebc7e0f1059f3ecfa57c4, 0x05c1db23f3c7d47ad7e7d7cfda5189, 0x79bb6bbbd8facf011f022fa9051aec, 0x24faa4cef474bed639362ea71f7a21, 0x1503aa50b77e24b030841a7d061581, 0x5bbf4e62805e1860a904c0f66a5fad, 0x5cbd24b72442d2ce647dd7d0a44368, 0x074a8839a4460c169dce7138efdaef, 0x0f06e09e3191b995b08e5b45182f65, 0x51fad4a89f8369fe10e5d4b6e149a1, 0xdc778b15982d11ebf7fe23b4e15f10, 0xa09ff3a4567077510c474e4ac0a21a, 0xb37e69e5dbb77167b73065e4c5ad6a, 0xecf4774e22e7fe3a38642186f7ae74, 0x16e72b5eb4c813a3b37998083aab81, 0xa48e7050aa8abedce5a45c16985376, 0xdd3285e53b322b221f7bcf4f8f8ad8, 0x0132
     ];
 
-    main(
+    let _ = main(
         body_hash_index,
         header,
         body,
