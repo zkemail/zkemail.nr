@@ -13,7 +13,7 @@ witness_seconds=$(echo "$duration_witness / 1000000000" | bc -l)
 echo "Witness generated in: $witness_seconds seconds"
 
 ## Generate the proof
-bb prove_mega_honk -b ./target/noir_zkemail.json -w ./target/witness-name.gz -o ./target/proo
+bb prove_mega_honk -b ./target/noir_zkemail.json -w ./target/witness.gz -o ./target/proof
 
 ## Log the time taken to generate the proof
 end_time=$(date +%s%N)
