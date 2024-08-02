@@ -117,8 +117,9 @@ pub fn extract_expected_recipient_domain(
 ) -> [u8; TO_DOMAIN_LENGTH] {
     let mut recipient_domain = [0 as u8; TO_DOMAIN_LENGTH];
     for i in 0..TO_DOMAIN_LENGTH {
-        // iterator + found index starting the to search + length of recipient local address + len(to:) + next index
-        recipient_domain[i] = header[i + index + recipient_local_length + 3 + 1];
+        // iterator + found index starting the to search + length of recipient local address + len(to:)
+        // should start at `@`
+        recipient_domain[i] = header[i + index + recipient_local_length + 3];
     }
     recipient_domain
 }

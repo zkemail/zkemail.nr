@@ -1,6 +1,7 @@
 #!/bin/bash
 
 ## Start timer
+nargo compile --force
 start_time=$(date +%s%N)
 
 ## Calculate the witness of the circuit
@@ -13,7 +14,7 @@ witness_seconds=$(echo "$duration_witness / 1000000000" | bc -l)
 echo "Witness generated in: $witness_seconds seconds"
 
 ## Generate the proof
-bb prove -b ./target/noir_zkemail.json -w ./target/witness-name.gz -o ./target/proof
+bb prove -b ./target/noir_zkemail.json -w ./target/witness.gz -o ./target/proof
 
 ## Log the time taken to generate the proof
 end_time=$(date +%s%N)

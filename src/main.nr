@@ -11,13 +11,11 @@ type BN2048 = BigNum<18, Params2048>;
 type RSA2048 = RSA<BN2048, BigNumInstance<18, Params2048>, 256>;
 
 global BODY_HASH_BASE64_LENGTH: u32 = 44;
-// global EMAIL_HEADER_LENGTH: u32 = 470;
-// global EMAIL_BODY_LENGTH: u32 = 744;
 global EMAIL_HEADER_LENGTH: u32 = 472;
 global EMAIL_BODY_LENGTH: u32 = 24;
 global MAX_ADDRESS_LOCAL_LENGTH = 64; // the max part before @ in the email address
-global TO_DOMAIN_LENGTH: u32 = 9;
-global TO_DOMAIN: [u8; TO_DOMAIN_LENGTH] = "gmail.com".as_bytes(); // example of string search
+global TO_DOMAIN_LENGTH: u32 = 10;
+global TO_DOMAIN: [u8; TO_DOMAIN_LENGTH] = "@gmail.com".as_bytes(); // example of string search
 
 fn main(
     body_hash_index: u32,
@@ -54,9 +52,10 @@ fn main(
     // string search for the asserted recipient domain
     let (found, index) = utils::find_to_index(header, padded_recipient_local, recipient_local_length);
     assert(found);
+
     // extract the recipient domain
     let recipient_domain = utils::extract_expected_recipient_domain(header, recipient_local_length, index);
-    println(recipient_domain);
+    assert(recipient_domain == TO_DOMAIN);
 }
 
 #[test]
