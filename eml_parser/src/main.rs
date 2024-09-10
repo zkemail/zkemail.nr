@@ -45,7 +45,7 @@ fn main() {
     let dkim_header = &eml
         .headers
         .iter()
-        .find(|header| header.name == "DKIM-Signature")
+        .find(|header| header.name.eq_ignore_ascii_case("DKIM-Signature"))
         .unwrap()
         .value;
 
@@ -194,12 +194,12 @@ fn clean_dkim_signature(dkim_signature: &str) -> String {
 pub fn build_relaxed_headers(eml: &Eml) -> RelaxedHeaders {
     let headers = &eml.headers;
     let subject = eml.subject.clone().unwrap();
+    // if "from" is not present, use "From" parsed from eml-parser
     let from = headers
         .iter()
         .find(|header| header.name == "from")
-        .unwrap()
-        .value
-        .to_string();
+        .map(|header| header.value.to_string())
+        .unwrap_or_else(|| eml.from.as_ref().map(|val| val.to_string()).unwrap_or_default());
     let content_type = headers
         .iter()
         .find(|header| header.name == "Content-Type")
@@ -208,13 +208,13 @@ pub fn build_relaxed_headers(eml: &Eml) -> RelaxedHeaders {
         .to_string();
     let mime_version = headers
         .iter()
-        .find(|header| header.name == "Mime-Version")
+        .find(|header| header.name.eq_ignore_ascii_case("Mime-Version"))
         .unwrap()
         .value
         .to_string();
     let message_id = headers
         .iter()
-        .find(|header| header.name == "Message-Id")
+        .find(|header| header.name.eq_ignore_ascii_case("Message-Id"))
         .unwrap()
         .value
         .to_string();
@@ -224,15 +224,10 @@ pub fn build_relaxed_headers(eml: &Eml) -> RelaxedHeaders {
         .unwrap()
         .value
         .to_string();
-    let to = headers
-        .iter()
-        .find(|header| header.name == "to")
-        .unwrap()
-        .value
-        .to_string();
+    let to = get_recipient(eml);
     let dkim_signature = headers
         .iter()
-        .find(|header| header.name == "DKIM-Signature")
+        .find(|header| header.name.eq_ignore_ascii_case("DKIM-Signature"))
         .unwrap()
         .value
         .to_string();
@@ -382,13 +377,7 @@ pub fn quote_hex(input: String) -> String {
 
 pub fn get_padded_recipient_local(eml: &Eml) -> (Vec<u8>, u32) {
     // find the header with the recipient email address
-    let recipient = eml
-        .headers
-        .iter()
-        .find(|header| header.name == "to")
-        .unwrap()
-        .value
-        .to_string();
+    let recipient = get_recipient(eml);
     // parse out the local part of the email address
     let re = Regex::new(r"^([^@]+)@").unwrap();
     let local = re.captures(&recipient).unwrap().get(1).unwrap().as_str();
@@ -402,4 +391,14 @@ pub fn get_padded_recipient_local(eml: &Eml) -> (Vec<u8>, u32) {
     // padded_recipient[..recipient.len()].copy_from_slice(recipient);
     // (padded_recipient, recipient_len)
     (local_bytes, local.len() as u32)
+}
+
+pub fn get_recipient(eml: &Eml) -> String {
+    // if "to" is not present, use "To" parsed from eml-parser
+    let recipient = eml.headers
+        .iter()
+        .find(|header| header.name.eq_ignore_ascii_case("to"))
+        .map(|header| header.value.to_string())
+        .unwrap_or_else(|| eml.to.as_ref().map(|val| val.to_string()).unwrap_or_default());
+    recipient
 }
