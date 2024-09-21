@@ -1,0 +1,8 @@
+[package]
+name = "verify_email_2048_bit_dkim"
+type = "bin"
+authors = ["Mach 34"]
+compiler_version = ">=0.34.0"
+
+[dependencies]
+zkemail = { path =  "../../lib"}
