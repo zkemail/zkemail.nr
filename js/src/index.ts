@@ -9,7 +9,7 @@ import {
   DKIMVerificationResult,
   verifyDKIMSignature,
 } from "@zk-email/helpers/dist/dkim";
-import * as NoirBignum from "noir_bignum";
+import * as NoirBignum from "@mach-34/noir-bignum-paramgen";
 
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
 // with a few modifications for noir input generation
@@ -101,11 +101,11 @@ export function generateEmailVerifierInputsFromDKIMResult(
     // modified from original: can use exact email header length
     emailHeaderLength: headers.length.toString(),
     // modified from original: use noir bignum to format
-    pubkey: NoirBignum.bn_limbs_from_string(publicKey.toString(16)),
-    // modified from original: use noir bignum to format
-    signature: NoirBignum.bn_limbs_from_string(signature.toString(16)),
+    pubkey: NoirBignum.bnToLimbStrArray(publicKey),
     // not in original: add barrett reduction param for efficient rsa sig verification
-    redcParams: NoirBignum.redc_limbs_from_string(publicKey.toString(16)),
+    redcParams: NoirBignum.bnToRedcLimbStrArray(publicKey),
+    // modified from original: use noir bignum to format
+    signature: NoirBignum.bnToLimbStrArray(signature),
   };
 
   // removed: header mask
