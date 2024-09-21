@@ -6,6 +6,7 @@ TODO
 
 ## Using the Input Generation JS Library
 TODO
+`yarn add @mach-34/zkemail-nr`
 
 ## Using ZKEmail.nr in EVM Smart Contracts
 TODO
