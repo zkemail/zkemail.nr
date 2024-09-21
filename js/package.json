@@ -1,14 +1,13 @@
 {
   "name": "@mach-34/zkemail-nr",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "dist",
   "license": "MIT",
   "scripts": {
     "build": "tsc",
     "test": "jest",
     "lint": "eslint .",
-    "prepublishOnly": "yarn lint && yarn build",
-    "publish": "npm publish --access=public"
+    "prepublishOnly": "yarn lint && yarn build"
   },
   "dependencies": {
     "@noir-lang/backend_barretenberg": "=0.34.0",

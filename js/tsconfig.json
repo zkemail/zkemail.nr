@@ -29,7 +29,9 @@
     },
     "include": [
         "src/**/*",
-        "tests/**/*"
+        "tests/**/*",
+        "README.md",
+        "LICENSE"
     ],
     "exclude": [
         "dist",
