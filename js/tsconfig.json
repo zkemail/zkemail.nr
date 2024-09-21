@@ -1,40 +1,38 @@
 {
     "compilerOptions": {
-      "target": "es2020",
-      "module": "commonjs",
-      "lib": [
-        "dom",
-        "dom.iterable",
-        "esnext"
-      ],
-      "allowJs": true,
-      "skipLibCheck": true,
-      "esModuleInterop": true,
-      "allowSyntheticDefaultImports": true,
-      "strict": true,
-      "forceConsistentCasingInFileNames": true,
-      "noFallthroughCasesInSwitch": true,
-      "moduleResolution": "node",
-      "resolveJsonModule": true,
-      "isolatedModules": true,
-      "typeRoots": [
-        "./node_modules/@types"
-      ],
-      "types": [
-        "node"
-      ],
-      "incremental": true,
-      "paths": {
-        "@zk-email/verify": [
-          "../zk-email-verify/packages/helpers"
-        ]
-      },
-      "outDir": "dist"
+        "target": "es2020",
+        "module": "commonjs",
+        "lib": [
+            "dom",
+            "dom.iterable",
+            "esnext"
+        ],
+        "allowJs": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "strict": true,
+        "forceConsistentCasingInFileNames": true,
+        "noFallthroughCasesInSwitch": true,
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "typeRoots": [
+            "./node_modules/@types"
+        ],
+        "types": [
+            "node",
+            "jest"
+        ],
+        "incremental": true,
+        "outDir": "dist"
     },
-    "exclude": [
-      "node_modules",
-      "./node_modules",
-      "./node_modules/*",
-      "./node_modules/@types/node/index.d.ts",
+    "include": [
+        "src/**/*",
+        "tests/**/*"
     ],
-  }
+    "exclude": [
+        "dist",
+        "node_modules"
+    ]
+}
