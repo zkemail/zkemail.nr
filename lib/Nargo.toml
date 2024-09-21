@@ -1,0 +1,10 @@
+[package]
+name = "zkemail.nr"
+type = "lib"
+authors = ["Mach 34"]
+compiler_version = ">=0.34.0"
+
+[dependencies]
+rsa = { tag = "v0.3.0", git = "https://github.com/noir-lang/noir_rsa", directory = "lib" }
+# base64 = { tag = "v0.2.1", git = "https://github.com/noir-lang/noir_base64" }
+# string_search = { tag = "v0.1", git = "https://github.com/noir-lang/noir_string_search"  }
