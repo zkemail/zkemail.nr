@@ -1,7 +1,8 @@
 {
   "name": "@mach-34/zkemail-nr",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "main": "dist",
+  "types": "dist",
   "license": "MIT",
   "scripts": {
     "build": "tsc",
@@ -34,11 +35,23 @@
     "ts-jest": "^29.2.5",
     "typescript": "5.5"
   },
+  "files": [
+    "dist/**/**",
+    "docs/**/**",
+    "!**/*.spec.*",
+    "!**/*.json",
+    "!**/*.tsbuildinfo",
+    "LICENSE",
+    "README.md"
+  ],
   "jest": {
     "roots": [
       "<rootDir>"
     ],
-    "testPathIgnorePatterns": ["/dist/", "/node_modules/"]
+    "testPathIgnorePatterns": [
+      "/dist/",
+      "/node_modules/"
+    ]
   },
   "babel": {
     "presets": [

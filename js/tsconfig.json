@@ -12,6 +12,7 @@
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "strict": true,
+        "declaration": true,
         "forceConsistentCasingInFileNames": true,
         "noFallthroughCasesInSwitch": true,
         "moduleResolution": "node",
@@ -25,11 +26,11 @@
             "jest"
         ],
         "incremental": true,
-        "outDir": "dist"
+        "outDir": "dist",
+        "tsBuildInfoFile": "./.tsbuildinfo"
     },
     "include": [
         "src/**/*",
-        "tests/**/*",
         "README.md",
         "LICENSE"
     ],
