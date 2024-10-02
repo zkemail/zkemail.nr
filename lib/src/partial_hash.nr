@@ -1,8 +1,9 @@
 use std::runtime::is_unconstrained;
 use std::hash::sha256_compression;
 
+// https://github.com/noir-lang/noir/blob/76eec710ff73e5e45fdddcd41ae2cd74e879cfa5/noir_stdlib/src/hash/sha256.nr#L23
 // Convert 64-byte array to array of 16 u32s
-fn msg_u8_to_u32(msg: [u8; 64]) -> [u32; 16] {
+fn msg_u8_to_u32(msg: [u8; BLOCK_SIZE]) -> [u32; 16] {
     let mut msg32: [u32; 16] = [0; 16];
 
     for i in 0..16 {
@@ -16,39 +17,43 @@ fn msg_u8_to_u32(msg: [u8; 64]) -> [u32; 16] {
     msg32
 }
 
-unconstrained fn build_msg_block_iter<let N: u32>(msg: [u8; N], message_size: u64, msg_start: u32) -> ([u8; 64], u64) {
+// https://github.com/noir-lang/noir/blob/76eec710ff73e5e45fdddcd41ae2cd74e879cfa5/noir_stdlib/src/hash/sha256.nr#L38
+unconstrained fn build_msg_block_iter<let N: u32>(msg: [u8; N], message_size: u32, msg_start: u32) -> ([u8; BLOCK_SIZE], u32) {
     let mut msg_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
-    let mut msg_byte_ptr: u64 = 0; // Message byte pointer
-    let mut msg_end = msg_start + BLOCK_SIZE;
-    if msg_end > N {
-        msg_end = N;
-    }
-    for k in msg_start..msg_end {
-        if k as u64 < message_size {
-            msg_block[msg_byte_ptr] = msg[k];
-            msg_byte_ptr = msg_byte_ptr + 1;
+    // We insert `BLOCK_SIZE` bytes (or up to the end of the message)
+    let block_input = if msg_start + BLOCK_SIZE > message_size {
+        if message_size < msg_start {
+            // This function is sometimes called with `msg_start` past the end of the message.
+            // In this case we return an empty block and zero pointer to signal that the result should be ignored.
+            0
+        } else {
+            message_size - msg_start
         }
+    } else {
+        BLOCK_SIZE
+    };
+    for k in 0..block_input {
+        msg_block[k] = msg[msg_start + k];
     }
-    (msg_block, msg_byte_ptr)
+    (msg_block, block_input)
 }
 
+// https://github.com/noir-lang/noir/blob/76eec710ff73e5e45fdddcd41ae2cd74e879cfa5/noir_stdlib/src/hash/sha256.nr#L59
 // Verify the block we are compressing was appropriately constructed
 fn verify_msg_block<let N: u32>(
     msg: [u8; N],
-    message_size: u64,
+    message_size: u32,
     msg_block: [u8; 64],
     msg_start: u32
-) -> u64 {
-    let mut msg_byte_ptr: u64 = 0; // Message byte pointer
+) -> u32 {
+    let mut msg_byte_ptr: u32 = 0; // Message byte pointer
     let mut msg_end = msg_start + BLOCK_SIZE;
-    let mut extra_bytes = 0;
     if msg_end > N {
         msg_end = N;
-        extra_bytes = msg_end - N;
     }
 
     for k in msg_start..msg_end {
-        if k as u64 < message_size {
+        if k < message_size {
             assert_eq(msg_block[msg_byte_ptr], msg[k]);
             msg_byte_ptr = msg_byte_ptr + 1;
         }
@@ -60,6 +65,7 @@ fn verify_msg_block<let N: u32>(
 global BLOCK_SIZE = 64;
 global ZERO = 0;
 
+// https://github.com/noir-lang/noir/blob/76eec710ff73e5e45fdddcd41ae2cd74e879cfa5/noir_stdlib/src/hash/sha256.nr#L86-L116
 /**
  * Partially computes a SHA256 hash of a message but does not finalize
  * @notice can be used for post-partial hashing where client proves part of hash and relies on server to finish
@@ -69,9 +75,8 @@ global ZERO = 0;
  * @param message_size: the actual length of the preimage to hash
  * @return the intermediate hash state
  */
-pub fn partial_sha256_var<let N: u32>(msg: [u8; N], message_size: u32) -> [u32; 8] {
-    let message_size = message_size as u64; // noir stdlib uses u64
-
+pub fn partial_sha256_var_start<let N: u32>(msg: [u8; N], message_size: u64) -> [u32; 8] {
+    let message_size = message_size as u32;
     let num_blocks = N / BLOCK_SIZE;
     let mut msg_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
     let mut h: [u32; 8] = [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225]; // Intermediate hash, starting with the canonical initial value
@@ -82,23 +87,23 @@ pub fn partial_sha256_var<let N: u32>(msg: [u8; N], message_size: u32) -> [u32; 
         let (new_msg_block, new_msg_byte_ptr) = unsafe {
             build_msg_block_iter(msg, message_size, msg_start)
         };
-        if msg_start as u64 < message_size {
+        if msg_start < message_size {
             msg_block = new_msg_block;
         }
 
         if !is_unconstrained() {
             // Verify the block we are compressing was appropriately constructed
             let new_msg_byte_ptr = verify_msg_block(msg, message_size, msg_block, msg_start);
-            if msg_start as u64 < message_size {
+            if msg_start < message_size {
                 msg_byte_ptr = new_msg_byte_ptr;
             }
-        } else if msg_start as u64 < message_size {
+        } else if msg_start < message_size {
             msg_byte_ptr = new_msg_byte_ptr;
         }
 
         // If the block is filled, compress it.
         // An un-filled block is handled after this loop.
-        if msg_byte_ptr == 64 {
+        if (msg_start < message_size) & (msg_byte_ptr == BLOCK_SIZE) {
             h = sha256_compression(msg_u8_to_u32(msg_block), h);
         }
     }
@@ -106,6 +111,7 @@ pub fn partial_sha256_var<let N: u32>(msg: [u8; N], message_size: u32) -> [u32; 
     h
 }
 
+// https://github.com/noir-lang/noir/blob/76eec710ff73e5e45fdddcd41ae2cd74e879cfa5/noir_stdlib/src/hash/sha256.nr#L85
 /**
  * Given some state of a partially computed sha256 hash and remaining preimage, complete the hash
  * @notice used for traditional partial hashing
@@ -117,14 +123,14 @@ pub fn partial_sha256_var<let N: u32>(msg: [u8; N], message_size: u32) -> [u32; 
  * @param real_message_size -= the total size of the preimage
  * @return finalized sha256 hash
  */
-pub fn finish_sha256_var<let N: u32>(
+pub fn partial_sha256_var_end<let N: u32>(
     mut h: [u32; 8],
     msg: [u8; N],
-    message_size: u32,
-    real_message_size: u32
+    message_size: u64,
+    real_message_size: u64
 ) -> [u8; 32] {
-    let message_size = message_size as u64; // noir stdlib uses u64
-    let real_message_size = real_message_size as u64; // noir stdlib uses u64
+    let message_size = message_size as u32; // noir stdlib uses u64
+    let real_message_size = real_message_size as u32; // noir stdlib uses u64
 
     let num_blocks = N / BLOCK_SIZE;
     let mut msg_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
@@ -135,23 +141,23 @@ pub fn finish_sha256_var<let N: u32>(
         let (new_msg_block, new_msg_byte_ptr) = unsafe {
             build_msg_block_iter(msg, message_size, msg_start)
         };
-        if msg_start as u64 < message_size {
+        if msg_start < message_size {
             msg_block = new_msg_block;
         }
 
         if !is_unconstrained() {
             // Verify the block we are compressing was appropriately constructed
             let new_msg_byte_ptr = verify_msg_block(msg, message_size, msg_block, msg_start);
-            if msg_start as u64 < message_size {
+            if msg_start < message_size {
                 msg_byte_ptr = new_msg_byte_ptr;
             }
-        } else if msg_start as u64 < message_size {
+        } else if msg_start < message_size {
             msg_byte_ptr = new_msg_byte_ptr;
         }
 
         // If the block is filled, compress it.
         // An un-filled block is handled after this loop.
-        if msg_byte_ptr == 64 {
+        if (msg_start < message_size) & (msg_byte_ptr == BLOCK_SIZE) {
             h = sha256_compression(msg_u8_to_u32(msg_block), h);
         }
     }
@@ -166,21 +172,21 @@ pub fn finish_sha256_var<let N: u32>(
             build_msg_block_iter(msg, message_size, msg_start)
         };
 
-        if msg_start as u64 < message_size {
+        if msg_start < message_size {
             msg_block = new_msg_block;
         }
 
         if !is_unconstrained() {
             let new_msg_byte_ptr = verify_msg_block(msg, message_size, msg_block, msg_start);
-            if msg_start as u64 < message_size {
+            if msg_start < message_size {
                 msg_byte_ptr = new_msg_byte_ptr;
             }
-        } else if msg_start as u64 < message_size {
+        } else if msg_start < message_size {
             msg_byte_ptr = new_msg_byte_ptr;
         }
     }
 
-    if msg_byte_ptr == BLOCK_SIZE as u64 {
+    if msg_byte_ptr == BLOCK_SIZE {
         msg_byte_ptr = 0;
     }
 
@@ -248,42 +254,37 @@ pub fn finish_sha256_var<let N: u32>(
     hash_final_block(msg_block, h)
 }
 
-unconstrained fn pad_msg_block(mut msg_block: [u8; 64], mut msg_byte_ptr: u64) -> ([u8; 64], u64) {
-    // If i >= 57, there aren't enough bits in the current message block to accomplish this, so
+unconstrained fn pad_msg_block(mut msg_block: [u8; BLOCK_SIZE], mut msg_byte_ptr: u32) -> ([u8; BLOCK_SIZE], u32) {
+   // If i >= 57, there aren't enough bits in the current message block to accomplish this, so
     // the 1 and 0s fill up the current block, which we then compress accordingly.
     if msg_byte_ptr >= 57 {
         // Not enough bits (64) to store length. Fill up with zeros.
-        if msg_byte_ptr < 64 {
-            for _ in 57..64 {
-                if msg_byte_ptr <= 63 {
-                    msg_block[msg_byte_ptr] = 0;
-                    msg_byte_ptr += 1;
-                }
-            }
+        for i in msg_byte_ptr..BLOCK_SIZE {
+            msg_block[i] = 0;
         }
+        (msg_block, BLOCK_SIZE)
+    } else {
+        (msg_block, msg_byte_ptr)
     }
-    (msg_block, msg_byte_ptr)
 }
 
-unconstrained fn attach_len_to_msg_block(mut msg_block: [u8; 64], mut msg_byte_ptr: u64, message_size: u64) -> [u8; 64] {
+unconstrained fn attach_len_to_msg_block(mut msg_block: [u8; BLOCK_SIZE], mut msg_byte_ptr: u32, message_size: u32) -> [u8; BLOCK_SIZE] {
+    // We assume that `msg_byte_ptr` is less than 57 because if not then it is reset to zero before calling this function.
+    // In any case, fill blocks up with zeros until the last 64 (i.e. until msg_byte_ptr = 56).
+
+    for i in msg_byte_ptr..56 {
+        msg_block[i] = 0;
+    }
+
     let len = 8 * message_size;
     let len_bytes: [u8; 8] = (len as Field).to_be_bytes();
-    for _i in 0..64 {
-        // In any case, fill blocks up with zeros until the last 64 (i.e. until msg_byte_ptr = 56).
-        if msg_byte_ptr < 56 {
-            msg_block[msg_byte_ptr] = 0;
-            msg_byte_ptr = msg_byte_ptr + 1;
-        } else if msg_byte_ptr < 64 {
-            for j in 0..8 {
-                msg_block[msg_byte_ptr + j] = len_bytes[j];
-            }
-            msg_byte_ptr += 8;
-        }
+    for i in 0..8 {
+        msg_block[56 + i] = len_bytes[i];
     }
     msg_block
 }
 
-fn hash_final_block(msg_block: [u8; 64], mut state: [u32; 8]) -> [u8; 32] {
+fn hash_final_block(msg_block: [u8; BLOCK_SIZE], mut state: [u32; 8]) -> [u8; 32] {
     let mut out_h: [u8; 32] = [0; 32]; // Digest as sequence of bytes
 
     // Hash final padded block
@@ -322,8 +323,8 @@ fn test_partial_hash() {
     for i in 0..data1.len() {
         data1[i] = data[data0.len() + i];
     }
-    let state = partial_sha256_var(data0, data0.len());
-    let hash = finish_sha256_var(state, data1, data1.len(), data.len());
+    let state = partial_sha256_var_start(data0, data0.len() as u64);
+    let hash = partial_sha256_var_end(state, data1, data1.len() as u64, data.len() as u64);
     let correct_hash = std::hash::sha256_var(data, data.len() as u64);
     assert_eq(hash, correct_hash);
 }
