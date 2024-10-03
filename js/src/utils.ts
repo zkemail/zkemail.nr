@@ -2,7 +2,7 @@
  * Transforms a u32 array to a u8 array
  * @dev sha-utils in zk-email-verify encodes partial hash as u8 array but noir expects u32
  *      transform back to keep upstream code but not have noir worry about transformation
- * 
+ *
  * @param input - the input to convert to 32 bit array
  * @returns - the input as a 32 bit array
  */
