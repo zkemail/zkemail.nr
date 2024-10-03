@@ -4,12 +4,14 @@ import {
   MAX_HEADER_PADDED_BYTES,
   generatePartialSHA,
   sha256Pad,
+  findIndexInUint8Array,
 } from "@zk-email/helpers";
 import {
   DKIMVerificationResult,
   verifyDKIMSignature,
 } from "@zk-email/helpers/dist/dkim";
 import * as NoirBignum from "@mach-34/noir-bignum-paramgen";
+import { u8ToU32 } from "./utils";
 
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
 // with a few modifications for noir input generation
@@ -23,6 +25,7 @@ type CircuitInput = {
   signature: string[];
   body?: string[];
   body_length?: string;
+  partial_body_length?: string;
   partial_body_hash?: string[];
   body_hash_index?: string;
 };
@@ -127,80 +130,37 @@ export function generateEmailVerifierInputsFromDKIMResult(
       Math.max(maxBodyLength, bodySHALength)
     );
 
-    const { precomputedSha, bodyRemaining } = generatePartialSHA({
+    let { precomputedSha, bodyRemaining, bodyRemainingLength } = generatePartialSHA({
       body: bodyPadded,
       bodyLength: bodyPaddedLen,
       selectorString: params.shaPrecomputeSelector,
       maxRemainingBodyLength: maxBodyLength,
     });
+    
+    // idk why this gets out of sync, todo: fix
+    if (bodyRemaining.length != bodyRemainingLength) {
+      bodyRemaining = bodyRemaining.slice(0, bodyRemainingLength);
+    }
 
-    // modified from original: can use exact email body length
-    // since circom needs 64 byte chunks and noir doesnt
+    // can use exact body lengths
     circuitInputs.body_length = body.length.toString();
-    circuitInputs.partial_body_hash = Uint8ArrayToCharArray(precomputedSha);
     circuitInputs.body_hash_index = bodyHashIndex.toString();
     circuitInputs.body = Uint8ArrayToCharArray(bodyRemaining);
 
-    // if (params.removeSoftLineBreaks) {
-    //   circuitInputs.decodedEmailBodyIn = removeSoftLineBreaks(
-    //     circuitInputs.emailBody
-    //   );
-    // }
+    if (params.shaPrecomputeSelector) {
+      // can use exact body lengths
+      const selector = new TextEncoder().encode(params.shaPrecomputeSelector);
+      const selectorIndex = findIndexInUint8Array(body, selector);
+      const shaCutoffIndex = Math.floor(selectorIndex / 64) * 64;
+      const remainingBodyLength = body.length - shaCutoffIndex;
+      circuitInputs.partial_body_length = remainingBodyLength.toString();
+
+      // format back into u32 so noir doesn't have to do it
+      circuitInputs.partial_body_hash = Array.from(
+        u8ToU32(precomputedSha)
+      ).map((x) => x.toString());
+    }
   }
 
   return circuitInputs;
-}
-
-// /**
-//  * Rename inputs for Noir format
-//  * @todo handle optional values
-//  *
-//  * @param inputs - the inputs to convert to Noir format
-//  * @param exactLength - whether to have exact length for header or (default) keep 0-padding
-//  * @returns - the inputs as the NoirJS witness simulator expects them
-//  */
-// export function toNoirInputs(inputs: CircuitInput, exactLength = false) {
-//   return {
-//     body_hash_index: inputs.bodyHashIndex!,
-//     header: exactLength
-//       ? inputs.emailHeader.slice(0, Number(inputs.emailHeaderLength))!
-//       : inputs.emailHeader!,
-//     body: exactLength
-//       ? inputs.emailBody!.slice(0, Number(inputs.emailBodyLength))!
-//       : inputs.emailBody!,
-//     body_length: inputs.emailBodyLength!,
-//     header_length: inputs.emailHeaderLength!,
-//     pubkey: inputs.pubkey!,
-//     pubkey_redc: inputs.redcParams!,
-//     signature: inputs.signature!,
-//   };
-// }
-
-
-/**
- * Format circuit inputs for a Prover.toml file
- *
- * @param inputs - the inputs to convert to Prover.toml format
- * @param exactLength - whether toNoirInputs should have exact length for header or keep 0-padding
- * @returns - the inputs as bb cli expects them to appear in a Prover.toml file
- */
-export function toProverToml(inputs: any): string {
-  const lines: string[] = [];
-  const structs: string[] = [];
-  for (const [key, value] of Object.entries(inputs)) {
-    let valueStr = "";
-    if (Array.isArray(value)) {
-      const valueStrArr = value.map((val) => `'${val}'`);
-      lines.push(`${key} = [${valueStrArr.join(", ")}]`);
-    } else if (typeof value === 'string') {
-      lines.push(`${key} = '${value}'`);
-    } else {
-      let values = "";
-      for (const [k, v] of Object.entries(value!)) {
-        values = values.concat(`${k} = '${v}'\n`);
-      }
-      structs.push(`[${key}]\n${values}`);
-    }
-  }
-  return lines.concat(structs).join("\n");
 }

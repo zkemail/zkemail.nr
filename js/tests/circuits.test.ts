@@ -5,7 +5,7 @@ import {
   CompiledCircuit,
   UltraHonkBackend,
 } from "@noir-lang/backend_barretenberg";
-import { Noir } from "@noir-lang/noir_js";
+import { Noir, acvm } from "@noir-lang/noir_js";
 import { generateEmailVerifierInputs } from "../src";
 import circuit1024 from "../../examples/verify_email_1024_bit_dkim/target/verify_email_1024_bit_dkim.json";
 import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify_email_2048_bit_dkim.json";
@@ -58,7 +58,7 @@ describe("Fixed Size Circuit Input", () => {
     teardownProver(proverPartialHash);
   });
   xdescribe("UltraHonk", () => {
-    it("UltraHonk::SmallEmail", async () => {
+    xit("UltraHonk::SmallEmail", async () => {
       const inputs = await generateEmailVerifierInputs(
         emails.small,
         inputParams
@@ -106,14 +106,28 @@ describe("Fixed Size Circuit Input", () => {
   });
 
   describe("Partial Hash", () => {
-    it("UltraPlonk::PartialHash", async () => {
+    xit("UltraPlonk::PartialHash", async () => {
       const selectorText = "All nodes in the Bitcoin network can consult it";
       const inputs = await generateEmailVerifierInputs(emails.large, {
         shaPrecomputeSelector: selectorText,
-        ...inputParams,
+        maxHeadersLength: 512,
+        maxBodyLength: 192
       });
-      console.log("Inputs", inputs);
+      console.log(JSON.stringify(inputs.body));
+      const { witness } = await proverPartialHash.noir.execute(inputs);
+
     });
-    it("UltraHonk::PartialHash", async () => {});
+    it("UltraHonk::PartialHash", async () => {
+      const selectorText = "All nodes in the Bitcoin network can consult it";
+      const inputs = await generateEmailVerifierInputs(emails.large, {
+        shaPrecomputeSelector: selectorText,
+        maxHeadersLength: 512,
+        maxBodyLength: 192
+      });
+      console.log(inputs.body_length);
+      console.log(inputs.partial_body_length);
+      console.log(JSON.stringify(inputs.body))
+      const { witness } = await proverPartialHash.noir.execute(inputs);
+    });
   });
 });

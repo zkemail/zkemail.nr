@@ -1674,6 +1674,11 @@
   resolved "https://registry.yarnpkg.com/@noir-lang/acvm_js/-/acvm_js-0.50.0.tgz#b423998340b7422e6da94e750516a36cee4f0cba"
   integrity sha512-tmD3eZ8GbkkD001S/YVIrp91sy+XW1ZeVRObio1WgvX9081kJS1xptBglMO4ITzdHOLLuIeaChlUhCgNtwFB9Q==
 
+"@noir-lang/acvm_js@^0.51.0":
+  version "0.51.0"
+  resolved "https://registry.yarnpkg.com/@noir-lang/acvm_js/-/acvm_js-0.51.0.tgz#0519b9581f78a37d9a12c85599c853c805716bca"
+  integrity sha512-yz57N4g27Vm4qdVpaMDIlTdBff4dAGrH7+GD5+QMr84CTeDgx0WQKfK0BYuZLnfesnFqLA/sFvR+eHJUp8n+hQ==
+
 "@noir-lang/backend_barretenberg@=0.34.0":
   version "0.34.0"
   resolved "https://registry.yarnpkg.com/@noir-lang/backend_barretenberg/-/backend_barretenberg-0.34.0.tgz#d152ab15977d282212161f980e98149ecd87f72f"
