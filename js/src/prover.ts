@@ -12,7 +12,9 @@ type ProvingBackend = "honk" | "plonk" | "all";
 
 export class ZKEmailProver {
   private plonk?: BarretenbergBackend;
+
   private honk?: UltraHonkBackend;
+
   private noir: Noir;
 
   constructor(
@@ -41,7 +43,7 @@ export class ZKEmailProver {
   async simulateWitness(
     input: CircuitInput
   ): Promise<{ witness: Uint8Array; returnValue: InputValue }> {
-    return await this.noir.execute(input);
+    return this.noir.execute(input);
   }
 
   /**
@@ -57,27 +59,22 @@ export class ZKEmailProver {
   ): Promise<ProofData> {
     // determine proving backend to use
     let backend: BarretenbergBackend | UltraHonkBackend;
-    if (provingBackend) {
-      // check that the asserted backend is initialized
-      if (provingBackend === "plonk" && this.plonk) {
-        backend = this.plonk;
-      } else if (provingBackend === "honk" && this.honk) {
-        backend = this.honk;
-      } else {
-        throw new Error(`Proving scheme ${provingBackend} not initialized`);
-      }
+    if (
+      (provingBackend && this.plonk) ||
+      (this.provingBackend === "plonk" && this.plonk)
+    ) {
+      backend = this.plonk;
+    } else if (
+      (provingBackend === "honk" && this.honk) ||
+      (this.provingBackend === "honk" && this.honk)
+    ) {
+      backend = this.honk;
     } else {
-      // default to the backend used to initialize the class
-      if (this.provingBackend === "honk" && this.honk) {
-        backend = this.honk;
-      } else if (this.provingBackend === "plonk" && this.plonk) {
-        backend = this.plonk;
-      } else {
-        throw new Error(`Proving scheme ${this.provingBackend} not initialized`);
-      }
+      throw new Error(`Proving scheme ${this.provingBackend} not initialized`);
     }
+
     // generate the proof
-    return await backend.generateProof(witness);
+    return backend.generateProof(witness);
   }
 
   /**
@@ -92,7 +89,7 @@ export class ZKEmailProver {
     provingBackend?: ProvingBackend
   ): Promise<ProofData> {
     const { witness } = await this.simulateWitness(input);
-    return await this.prove(witness, provingBackend);
+    return this.prove(witness, provingBackend);
   }
 
   /**
@@ -108,27 +105,21 @@ export class ZKEmailProver {
   ): Promise<boolean> {
     // determine proving backend to use
     let backend: BarretenbergBackend | UltraHonkBackend;
-    if (provingBackend) {
-      // check that the asserted backend is initialized
-      if (provingBackend === "plonk" && this.plonk) {
-        backend = this.plonk;
-      } else if (provingBackend === "honk" && this.honk) {
-        backend = this.honk;
-      } else {
-        throw new Error(`Proving scheme ${provingBackend} not initialized`);
-      }
+    if (
+      (provingBackend && this.plonk) ||
+      (this.provingBackend === "plonk" && this.plonk)
+    ) {
+      backend = this.plonk;
+    } else if (
+      (provingBackend === "honk" && this.honk) ||
+      (this.provingBackend === "honk" && this.honk)
+    ) {
+      backend = this.honk;
     } else {
-      // default to the backend used to initialize the class
-      if (this.provingBackend === "honk" && this.honk) {
-        backend = this.honk;
-      } else if (this.provingBackend === "plonk" && this.plonk) {
-        backend = this.plonk;
-      } else {
-        throw new Error(`Proving scheme ${this.provingBackend} not initialized`);
-      }
+      throw new Error(`Proving scheme ${this.provingBackend} not initialized`);
     }
     // verify the proof
-    return await backend.verifyProof(proof);
+    return backend.verifyProof(proof);
   }
 
   /**

@@ -39,30 +39,30 @@ export type InputGenerationArgs = {
 };
 
 // copied without modification, but not publicly exported in original
-function removeSoftLineBreaks(body: string[]): string[] {
-  const result = [];
-  let i = 0;
-  while (i < body.length) {
-    if (
-      i + 2 < body.length &&
-      body[i] === "61" && // '=' character
-      body[i + 1] === "13" && // '\r' character
-      body[i + 2] === "10"
-    ) {
-      // '\n' character
-      // Skip the soft line break sequence
-      i += 3; // Move past the soft line break
-    } else {
-      result.push(body[i]);
-      i++;
-    }
-  }
-  // Pad the result with zeros to make it the same length as the body
-  while (result.length < body.length) {
-    result.push("0");
-  }
-  return result;
-}
+// function removeSoftLineBreaks(body: string[]): string[] {
+//   const result = [];
+//   let i = 0;
+//   while (i < body.length) {
+//     if (
+//       i + 2 < body.length &&
+//       body[i] === "61" && // '=' character
+//       body[i + 1] === "13" && // '\r' character
+//       body[i + 2] === "10"
+//     ) {
+//       // '\n' character
+//       // Skip the soft line break sequence
+//       i += 3; // Move past the soft line break
+//     } else {
+//       result.push(body[i]);
+//       i++;
+//     }
+//   }
+//   // Pad the result with zeros to make it the same length as the body
+//   while (result.length < body.length) {
+//     result.push("0");
+//   }
+//   return result;
+// }
 
 // copied without modification, needed for different generateEmailVerifierInnputsFromDKIMResult
 /**
@@ -130,15 +130,16 @@ export function generateEmailVerifierInputsFromDKIMResult(
       Math.max(maxBodyLength, bodySHALength)
     );
 
-    let { precomputedSha, bodyRemaining, bodyRemainingLength } = generatePartialSHA({
+    const { precomputedSha, bodyRemainingLength, ...rest } = generatePartialSHA({
       body: bodyPadded,
       bodyLength: bodyPaddedLen,
       selectorString: params.shaPrecomputeSelector,
       maxRemainingBodyLength: maxBodyLength,
     });
-    
+    // code smell but it passes the linter
+    let { bodyRemaining } = rest;
     // idk why this gets out of sync, todo: fix
-    if (params.shaPrecomputeSelector && bodyRemaining.length != bodyRemainingLength) {
+    if (params.shaPrecomputeSelector && bodyRemaining.length !== bodyRemainingLength) {
       bodyRemaining = bodyRemaining.slice(0, bodyRemainingLength);
     }
 
