@@ -1694,10 +1694,22 @@
   dependencies:
     "@noir-lang/types" "0.34.0"
 
+"@noir-lang/noirc_abi@^0.35.0":
+  version "0.35.0"
+  resolved "https://registry.yarnpkg.com/@noir-lang/noirc_abi/-/noirc_abi-0.35.0.tgz#6b56f356a056ef4f935503d70460afa2aae76018"
+  integrity sha512-iTlHWHdnxgwQveGNCaeQKj1UenFqtnWvh62mfY7m/GD9cs9LB5PFs57rmYMEGaQysEix3sM3BmSX1h9C93pHDg==
+  dependencies:
+    "@noir-lang/types" "0.35.0"
+
 "@noir-lang/types@0.34.0":
   version "0.34.0"
   resolved "https://registry.yarnpkg.com/@noir-lang/types/-/types-0.34.0.tgz#909d4a170177c7ab5adfeed5dc8660d69825ced2"
   integrity sha512-04A14JMPt5G6/cCD4n59W0DUtAbcN8YByvSJ6gj0VQramd11tWK3ZqhKadnQrzhA0GwEvROd6jvn/blKdHlSXQ==
+
+"@noir-lang/types@0.35.0":
+  version "0.35.0"
+  resolved "https://registry.yarnpkg.com/@noir-lang/types/-/types-0.35.0.tgz#47e73db1c545b0a68a7b1c4d551843ed71e47291"
+  integrity sha512-m4zzTuWVeYI/lgAKU4XwS61lfU/vr8laal8mLm2YEym8GTyVfezjjVrzQd0/mOZtpZ6hO7r3rbd3W2Vs9IkMrg==
 
 "@rtsao/scc@^1.1.0":
   version "1.1.0"
@@ -4783,9 +4795,9 @@ slash@^3.0.0:
   resolved "https://registry.yarnpkg.com/slash/-/slash-3.0.0.tgz#6539be870c165adbd5240220dbe361f1bc4d4634"
   integrity sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==
 
-"snarkjs@git+https://github.com/sampritipanda/snarkjs.git#fef81fc51d17a734637555c6edbd585ecda02d9e":
+"snarkjs@https://github.com/sampritipanda/snarkjs.git#fef81fc51d17a734637555c6edbd585ecda02d9e":
   version "0.5.0"
-  resolved "git+https://github.com/sampritipanda/snarkjs.git#fef81fc51d17a734637555c6edbd585ecda02d9e"
+  resolved "https://github.com/sampritipanda/snarkjs.git#fef81fc51d17a734637555c6edbd585ecda02d9e"
   dependencies:
     "@iden3/binfileutils" "0.0.11"
     bfj "^7.0.2"
