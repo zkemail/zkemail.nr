@@ -17,7 +17,7 @@ import { u8ToU32 } from "./utils";
 // with a few modifications for noir input generation
 // also removes some of the unused functionality like masking
 
-type CircuitInput = {
+export type CircuitInput = {
   header: string[];
   header_length: string;
   pubkey: string[];
@@ -30,7 +30,7 @@ type CircuitInput = {
   body_hash_index?: string;
 };
 
-type InputGenerationArgs = {
+export type InputGenerationArgs = {
   ignoreBodyHashCheck?: boolean;
   shaPrecomputeSelector?: string;
   maxHeadersLength?: number; // Max length of the email header including padding
