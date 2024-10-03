@@ -14,7 +14,8 @@ global BODY_HASH_BASE64_LENGTH: u32 = 44;
 
 /**
  * Standard outputs that essentially every email circuit will need to export (alongside app-specific outputs)
- * 
+ * @notice if you only need the pubkey hash just import pedersen and hash away 
+ *
  * @param pubkey - the BN limbs of the DKIM RSA pubkey
  * @param signature - the BN limbs of the DKIM RSA signature
  * @returns

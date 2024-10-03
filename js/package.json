@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@mach-34/noir-bignum-paramgen": "^1.0.2",
-    "@noir-lang/acvm_js": "^0.51.0",
     "@noir-lang/backend_barretenberg": "=0.34.0",
     "@noir-lang/noir_js": "=0.34.0",
     "@zk-email/helpers": "=6.1.5"

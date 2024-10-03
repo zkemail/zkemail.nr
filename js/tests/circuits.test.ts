@@ -106,16 +106,17 @@ describe("Fixed Size Circuit Input", () => {
   });
 
   describe("Partial Hash", () => {
-    xit("UltraPlonk::PartialHash", async () => {
+    it("UltraPlonk::PartialHash", async () => {
       const selectorText = "All nodes in the Bitcoin network can consult it";
       const inputs = await generateEmailVerifierInputs(emails.large, {
         shaPrecomputeSelector: selectorText,
         maxHeadersLength: 512,
         maxBodyLength: 192
       });
-      console.log(JSON.stringify(inputs.body));
       const { witness } = await proverPartialHash.noir.execute(inputs);
-
+      const proof = await proverPartialHash.barretenberg.generateProof(witness);
+      const result = await proverPartialHash.barretenberg.verifyProof(proof);
+      expect(result).toBeTruthy();
     });
     it("UltraHonk::PartialHash", async () => {
       const selectorText = "All nodes in the Bitcoin network can consult it";
@@ -124,10 +125,10 @@ describe("Fixed Size Circuit Input", () => {
         maxHeadersLength: 512,
         maxBodyLength: 192
       });
-      console.log(inputs.body_length);
-      console.log(inputs.partial_body_length);
-      console.log(JSON.stringify(inputs.body))
       const { witness } = await proverPartialHash.noir.execute(inputs);
+      const proof = await proverPartialHash.ultraHonk.generateProof(witness);
+      const result = await proverPartialHash.ultraHonk.verifyProof(proof);
+      expect(result).toBeTruthy();
     });
   });
 });
