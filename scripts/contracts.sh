@@ -15,6 +15,7 @@ compile_example() {
 }
 
 # Loop over every child folder in the examples directory
+cd ..
 for folder in ./examples/*/; do
     if [ -d "$folder" ]; then
         compile_example "$folder"

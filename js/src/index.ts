@@ -16,16 +16,15 @@ import * as NoirBignum from "@mach-34/noir-bignum-paramgen";
 // also removes some of the unused functionality like masking
 
 type CircuitInput = {
-  emailHeader: string[];
-  emailHeaderLength: string;
+  header: string[];
+  header_length: string;
   pubkey: string[];
-  redcParams?: string[];
+  pubkey_redc: string[];
   signature: string[];
-  emailBody?: string[];
-  emailBodyLength?: string;
-  precomputedSHA?: string[];
-  bodyHashIndex?: string;
-  decodedEmailBodyIn?: string[];
+  body?: string[];
+  body_length?: string;
+  partial_body_hash?: string[];
+  body_hash_index?: string;
 };
 
 type InputGenerationArgs = {
@@ -97,13 +96,13 @@ export function generateEmailVerifierInputsFromDKIMResult(
   );
 
   const circuitInputs: CircuitInput = {
-    emailHeader: Uint8ArrayToCharArray(messagePadded), // Packed into 1 byte signals
+    header: Uint8ArrayToCharArray(messagePadded), // Packed into 1 byte signals
     // modified from original: can use exact email header length
-    emailHeaderLength: headers.length.toString(),
+    header_length: headers.length.toString(),
     // modified from original: use noir bignum to format
     pubkey: NoirBignum.bnToLimbStrArray(publicKey),
     // not in original: add barrett reduction param for efficient rsa sig verification
-    redcParams: NoirBignum.bnToRedcLimbStrArray(publicKey),
+    pubkey_redc: NoirBignum.bnToRedcLimbStrArray(publicKey),
     // modified from original: use noir bignum to format
     signature: NoirBignum.bnToLimbStrArray(signature),
   };
@@ -137,45 +136,46 @@ export function generateEmailVerifierInputsFromDKIMResult(
 
     // modified from original: can use exact email body length
     // since circom needs 64 byte chunks and noir doesnt
-    circuitInputs.emailBodyLength = body.length.toString();
-    circuitInputs.precomputedSHA = Uint8ArrayToCharArray(precomputedSha);
-    circuitInputs.bodyHashIndex = bodyHashIndex.toString();
-    circuitInputs.emailBody = Uint8ArrayToCharArray(bodyRemaining);
+    circuitInputs.body_length = body.length.toString();
+    circuitInputs.partial_body_hash = Uint8ArrayToCharArray(precomputedSha);
+    circuitInputs.body_hash_index = bodyHashIndex.toString();
+    circuitInputs.body = Uint8ArrayToCharArray(bodyRemaining);
 
-    if (params.removeSoftLineBreaks) {
-      circuitInputs.decodedEmailBodyIn = removeSoftLineBreaks(
-        circuitInputs.emailBody
-      );
-    }
+    // if (params.removeSoftLineBreaks) {
+    //   circuitInputs.decodedEmailBodyIn = removeSoftLineBreaks(
+    //     circuitInputs.emailBody
+    //   );
+    // }
   }
 
   return circuitInputs;
 }
 
-/**
- * Rename inputs for Noir format
- * @todo handle optional values
- *
- * @param inputs - the inputs to convert to Noir format
- * @param exactLength - whether to have exact length for header or (default) keep 0-padding
- * @returns - the inputs as the NoirJS witness simulator expects them
- */
-export function toNoirInputs(inputs: CircuitInput, exactLength = false) {
-  return {
-    body_hash_index: inputs.bodyHashIndex!,
-    header: exactLength
-      ? inputs.emailHeader.slice(0, Number(inputs.emailHeaderLength))!
-      : inputs.emailHeader!,
-    body: exactLength
-      ? inputs.emailBody!.slice(0, Number(inputs.emailBodyLength))!
-      : inputs.emailBody!,
-    body_length: inputs.emailBodyLength!,
-    header_length: inputs.emailHeaderLength!,
-    pubkey: inputs.pubkey!,
-    pubkey_redc: inputs.redcParams!,
-    signature: inputs.signature!,
-  };
-}
+// /**
+//  * Rename inputs for Noir format
+//  * @todo handle optional values
+//  *
+//  * @param inputs - the inputs to convert to Noir format
+//  * @param exactLength - whether to have exact length for header or (default) keep 0-padding
+//  * @returns - the inputs as the NoirJS witness simulator expects them
+//  */
+// export function toNoirInputs(inputs: CircuitInput, exactLength = false) {
+//   return {
+//     body_hash_index: inputs.bodyHashIndex!,
+//     header: exactLength
+//       ? inputs.emailHeader.slice(0, Number(inputs.emailHeaderLength))!
+//       : inputs.emailHeader!,
+//     body: exactLength
+//       ? inputs.emailBody!.slice(0, Number(inputs.emailBodyLength))!
+//       : inputs.emailBody!,
+//     body_length: inputs.emailBodyLength!,
+//     header_length: inputs.emailHeaderLength!,
+//     pubkey: inputs.pubkey!,
+//     pubkey_redc: inputs.redcParams!,
+//     signature: inputs.signature!,
+//   };
+// }
+
 
 /**
  * Format circuit inputs for a Prover.toml file
@@ -184,21 +184,23 @@ export function toNoirInputs(inputs: CircuitInput, exactLength = false) {
  * @param exactLength - whether toNoirInputs should have exact length for header or keep 0-padding
  * @returns - the inputs as bb cli expects them to appear in a Prover.toml file
  */
-export function toProverToml(
-  inputs: CircuitInput,
-  exactLength = false
-): string {
-  const formatted = toNoirInputs(inputs, exactLength);
+export function toProverToml(inputs: any): string {
   const lines: string[] = [];
-  for (const [key, value] of Object.entries(formatted)) {
+  const structs: string[] = [];
+  for (const [key, value] of Object.entries(inputs)) {
     let valueStr = "";
     if (Array.isArray(value)) {
       const valueStrArr = value.map((val) => `'${val}'`);
-      valueStr = `[${valueStrArr.join(", ")}]`;
+      lines.push(`${key} = [${valueStrArr.join(", ")}]`);
+    } else if (typeof value === 'string') {
+      lines.push(`${key} = '${value}'`);
     } else {
-      valueStr = `'${value}'`;
+      let values = "";
+      for (const [k, v] of Object.entries(value!)) {
+        values = values.concat(`${k} = '${v}'\n`);
+      }
+      structs.push(`[${key}]\n${values}`);
     }
-    lines.push(`${key} = ${valueStr}`);
   }
-  return lines.join("\n");
+  return lines.concat(structs).join("\n");
 }

@@ -8,7 +8,7 @@ compile_example() {
     pushd "$project" > /dev/null
     
     # Run the compile command
-    nargo compile --force
+    nargo compile --force --silence-warnings
     
     # Use popd to return to the previous directory
     popd > /dev/null
