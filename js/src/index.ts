@@ -138,7 +138,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
     });
     
     // idk why this gets out of sync, todo: fix
-    if (bodyRemaining.length != bodyRemainingLength) {
+    if (params.shaPrecomputeSelector && bodyRemaining.length != bodyRemainingLength) {
       bodyRemaining = bodyRemaining.slice(0, bodyRemainingLength);
     }
 

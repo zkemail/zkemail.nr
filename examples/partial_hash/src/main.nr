@@ -1,5 +1,5 @@
 use dep::zkemail::{
-    KEY_LIMBS_2048, base64::bodyhash_base64_decode, dkim::verify_dkim_2048, body_hash::get_body_hash_by_index,
+    KEY_LIMBS_2048, dkim::verify_dkim_2048, get_body_hash_by_index, base64::body_hash_base64_decode,
     partial_hash::partial_sha256_var_end, standard_outputs
 };
 
@@ -42,12 +42,10 @@ fn main(
 
     // manually extract the body hash from the header
     let body_hash_encoded = get_body_hash_by_index(header, body_hash_index);
-    let signed_body_hash: [u8; 32] = bodyhash_base64_decode(body_hash_encoded);
+    let signed_body_hash: [u8; 32] = body_hash_base64_decode(body_hash_encoded);
 
     // finish the partial hash
     let computed_body_hash = partial_sha256_var_end(partial_body_hash, body, partial_body_length as u64, body_length as u64);    
-    println(signed_body_hash);
-    println(computed_body_hash);
 
     // check the body hashes match
     assert(

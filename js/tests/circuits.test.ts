@@ -32,7 +32,8 @@ function makeProver(circuit: CompiledCircuit): Prover {
 }
 
 async function teardownProver(prover: Prover) {
-  await prover.barretenberg.destroy(), await prover.ultraHonk.destroy();
+  await prover.barretenberg.destroy();
+  await prover.ultraHonk.destroy();
 }
 
 describe("Fixed Size Circuit Input", () => {
@@ -57,8 +58,8 @@ describe("Fixed Size Circuit Input", () => {
     teardownProver(prover2048);
     teardownProver(proverPartialHash);
   });
-  xdescribe("UltraHonk", () => {
-    xit("UltraHonk::SmallEmail", async () => {
+  describe("UltraHonk", () => {
+    it("UltraHonk::SmallEmail", async () => {
       const inputs = await generateEmailVerifierInputs(
         emails.small,
         inputParams
@@ -81,7 +82,7 @@ describe("Fixed Size Circuit Input", () => {
     });
   });
 
-  xdescribe("UltraPlonk", () => {
+  describe("UltraPlonk", () => {
     it("UltraPlonk::SmallEmail", async () => {
       const inputs = await generateEmailVerifierInputs(
         emails.small,
@@ -111,7 +112,7 @@ describe("Fixed Size Circuit Input", () => {
       const inputs = await generateEmailVerifierInputs(emails.large, {
         shaPrecomputeSelector: selectorText,
         maxHeadersLength: 512,
-        maxBodyLength: 192
+        maxBodyLength: 192,
       });
       const { witness } = await proverPartialHash.noir.execute(inputs);
       const proof = await proverPartialHash.barretenberg.generateProof(witness);
@@ -123,7 +124,7 @@ describe("Fixed Size Circuit Input", () => {
       const inputs = await generateEmailVerifierInputs(emails.large, {
         shaPrecomputeSelector: selectorText,
         maxHeadersLength: 512,
-        maxBodyLength: 192
+        maxBodyLength: 192,
       });
       const { witness } = await proverPartialHash.noir.execute(inputs);
       const proof = await proverPartialHash.ultraHonk.generateProof(witness);

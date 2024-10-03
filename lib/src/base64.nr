@@ -9,7 +9,7 @@ use crate::BODY_HASH_BASE64_LENGTH;
  * @param encoded - the base 64 encoded body hash
  * @returns the decoded sha256 hash
  */
-pub fn bodyhash_base64_decode(encoded: [u8; BODY_HASH_BASE64_LENGTH]) -> [u8; 32] {
+pub fn body_hash_base64_decode(encoded: [u8; BODY_HASH_BASE64_LENGTH]) -> [u8; 32] {
     let mut total_bits = [0 as u1; BODY_HASH_BASE64_LENGTH * 6];
     for i in 0..BODY_HASH_BASE64_LENGTH {
         let translate = base64_lookup(encoded[i] as u8);

@@ -1,7 +1,8 @@
 use dep::zkemail::{
-    KEY_LIMBS_1024, dkim::verify_dkim_1024, body_hash::{get_body_hash_by_index, compare_body_hash},
+    KEY_LIMBS_1024, dkim::verify_dkim_1024, get_body_hash_by_index, base64::body_hash_base64_decode,
     standard_outputs
 };
+use dep::std::hash::sha256_var;
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
@@ -38,11 +39,19 @@ fn main(
     // verify the dkim signature over the header
     verify_dkim_1024(header, header_length, pubkey, pubkey_redc, signature);
 
-    // manually extract the body hash from the header
+    // extract the body hash from the header
     let body_hash_encoded = get_body_hash_by_index(header, body_hash_index);
 
-    // compare the retrieved body hash to the computed body hash
-    compare_body_hash(body_hash_encoded, body, body_length);
+    // base64 decode the body hash
+    let signed_body_hash: [u8; 32] = body_hash_base64_decode(body_hash_encoded);
+
+    // hash the asserted body
+    let computed_body_hash: [u8; 32] = sha256_var(body, body_length as u64);
+
+    // compare the body hashes
+    assert(
+        signed_body_hash == computed_body_hash, "SHA256 hash computed over body does not match body hash found in DKIM-signed header"
+    );
 
     // hash the pubkey and signature for the standard outputs
     standard_outputs(pubkey, signature)
