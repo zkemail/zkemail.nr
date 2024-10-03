@@ -12,8 +12,10 @@ global MAX_PARTIAL_EMAIL_BODY_LENGTH: u32 = 192;
  * @param body_hash_index - The index of the body hash in the partial hash array
  * @param header - The email header, 0-padded at end to the MAX_EMAIL_HEADER_LENGTH
  * @param header_length - The actual length of the email header
- * @param body - The email body, 0-padded at end to the MAX_EMAIL_BODY_LENGTH
- * @param body_length - The actual length of the email body
+ * @param body - The remaining email body, 0-padded at end to the MAX_PARTIAL_EMAIL_BODY_LENGTH
+ * @param body_length - The full length of the email body
+ * @param partial_body_hash - The SHA256 state of the partially hashed body
+ * @param partial_body_length - The remaining length of the email body to hash
  * @param pubkey_modulus_limbs - The DKIM RSA Pubkey
  * @param redc_params_limbs - Barrett Reduction Parameter for Pubkey for efficient signature verification
  * @param signature - The DKIM RSA Signature
