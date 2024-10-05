@@ -5,8 +5,7 @@ import {
   UltraHonkBackend,
 } from "@noir-lang/backend_barretenberg";
 import { Noir } from "@noir-lang/noir_js";
-import { InputValue } from "@noir-lang/noirc_abi";
-import { CircuitInput } from "./index";
+import { InputValue, InputMap } from "@noir-lang/noirc_abi";
 
 type ProvingBackend = "honk" | "plonk" | "all";
 
@@ -41,7 +40,7 @@ export class ZKEmailProver {
    * @returns - the witness for the input and the output of the circuit if satisfiable
    */
   async simulateWitness(
-    input: CircuitInput
+    input: InputMap
   ): Promise<{ witness: Uint8Array; returnValue: InputValue }> {
     return this.noir.execute(input);
   }
@@ -85,7 +84,7 @@ export class ZKEmailProver {
    * @returns proof of valid execution of the circuit
    */
   async fullProve(
-    input: CircuitInput,
+    input: InputMap,
     provingBackend?: ProvingBackend
   ): Promise<ProofData> {
     const { witness } = await this.simulateWitness(input);
