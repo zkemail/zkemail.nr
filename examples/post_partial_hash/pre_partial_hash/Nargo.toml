@@ -1,0 +1,8 @@
+[package]
+name = "pre_partial_hash_aggregator"
+type = "bin"
+authors = ["mach-34"]
+compiler_version = ">=0.34.0"
+
+[dependencies]
+zkemail = { path =  "../../../lib"}

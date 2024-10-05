@@ -1,0 +1,2 @@
+[workspace]
+members = ["partial_hash_aggregator, post_partial_hash", "pre_partial_hash"]

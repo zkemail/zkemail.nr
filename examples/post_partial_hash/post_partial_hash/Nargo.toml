@@ -1,0 +1,8 @@
+[package]
+name = "post_partial_hash"
+type = "bin"
+authors = ["mach-34"]
+compiler_version = ">=0.34.0"
+
+[dependencies]
+zkemail = { path =  "../../../lib"}
