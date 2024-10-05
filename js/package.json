@@ -1,6 +1,6 @@
 {
   "name": "@mach-34/zkemail-nr",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "main": "dist",
   "types": "dist",
   "license": "MIT",
@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@mach-34/noir-bignum-paramgen": "^1.0.2",
-    "@noir-lang/backend_barretenberg": "=0.34.0",
-    "@noir-lang/noir_js": "=0.34.0",
+    "@noir-lang/backend_barretenberg": "=0.35.0",
+    "@noir-lang/noir_js": "=0.35.0",
     "@noir-lang/noirc_abi": "^0.35.0",
     "@zk-email/helpers": "=6.1.5"
   },
