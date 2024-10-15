@@ -2,3 +2,5 @@ node_modules
 target
 dist
 .tsbuildinfo
+zk-email-verify
+

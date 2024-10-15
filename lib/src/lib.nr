@@ -1,8 +1,12 @@
 use dep::std::hash::pedersen_hash;
+use dep::std::collections::bounded_vec::BoundedVec;
 
 mod dkim;
+mod header_field;
 mod partial_hash;
 mod base64;
+mod macro;
+mod masking;
 
 global RSA_EXPONENT: u32 = 65537;
 global KEY_BYTES_1024: u32 = 128;
@@ -10,6 +14,11 @@ global KEY_BYTES_2048: u32 = 256;
 global KEY_LIMBS_1024: u32 = 9;
 global KEY_LIMBS_2048: u32 = 18;
 global BODY_HASH_BASE64_LENGTH: u32 = 44;
+
+struct Sequence {
+    index: u32,
+    length: u32
+}
 
 /**
  * Get the body hash from the header by allowing circuit input to choose index
@@ -21,8 +30,8 @@ global BODY_HASH_BASE64_LENGTH: u32 = 44;
  * @returns The base 64 encoded body hash
  */
 pub fn get_body_hash_by_index<let MAX_HEADER_LENGTH: u32>(
-    header: [u8; MAX_HEADER_LENGTH],
-    index: u32
+    header: BoundedVec<u8; MAX_HEADER_LENGTH>,
+    body_hash_index: u32
 ) -> [u8; BODY_HASH_BASE64_LENGTH] {
     // check index range
     assert(index >= 3, "Index does not leave room for 'bh=' prefix");
