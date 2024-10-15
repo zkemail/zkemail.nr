@@ -3,6 +3,7 @@ use dep::rsa::bignum::runtime_bignum::BigNumInstance;
 use dep::rsa::types::RSA;
 use dep::rsa::bignum::BigNum;
 use dep::std::hash::sha256_var;
+use dep::std::collections::bounded_vec::BoundedVec;
 use crate::{KEY_LIMBS_1024, KEY_LIMBS_2048, KEY_BYTES_1024, KEY_BYTES_2048, RSA_EXPONENT};
 
 type BN1024 = BigNum<KEY_LIMBS_1024, Params1024>;
