@@ -1,3 +1,5 @@
+import { Sequence } from "./index";
+
 /**
  * Transforms a u32 array to a u8 array
  * @dev sha-utils in zk-email-verify encodes partial hash as u8 array but noir expects u32
@@ -44,3 +46,29 @@ export function toProverToml(inputs: any): string {
   }
   return lines.concat(structs).join("\n");
 }
+
+/**
+ * Get the index and length of a header field to use
+ *
+ * @param header - the header to search for the field in
+ * @param headerField - the field name to search for
+ * @returns - the index and length of the field in the header
+ */
+export function getHeaderSequence(
+  header: Buffer,
+  headerField: string
+): Sequence {
+  const regex = new RegExp(
+    `[${headerField[0].toUpperCase()}${headerField[0].toLowerCase()}]${headerField
+      .slice(1)
+      .toLowerCase()}:.*(?:\r?\n)?`
+  );
+  const match = header.toString().match(regex);
+  if (match === null)
+    throw new Error(`Field "${headerField}" not found in header`);
+  return { index: match.index!.toString(), length: match[0].length.toString() };
+}
+
+// export function computeStandardOutputs(email: Buffer): Promise<[bigint, bigint]> {
+
+// }

@@ -1,58 +1,56 @@
 use dep::zkemail::{
-    KEY_LIMBS_2048, dkim::verify_dkim_2048, get_body_hash_by_index, base64::body_hash_base64_decode,
-    standard_outputs
+    KEY_LIMBS_2048, dkim::verify_dkim_2048, headers::get_body_hash,
+    standard_outputs, RSAPubkey, Sequence
 };
-use dep::std::hash::sha256_var;
+use dep::std::{collections::bounded_vec::BoundedVec, hash::sha256_var};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
 
 /**
- * Verify an arbitrary email signed by a 1024-bit RSA DKIM signature
+ * Verify an arbitrary email signed by a 2048-bit RSA DKIM signature
+ * @dev TOTAL CONSTRAINTS: ~222,783
  *
- * @param body_hash_index - The index of the body hash in the partial hash array
  * @param header - The email header, 0-padded at end to the MAX_EMAIL_HEADER_LENGTH
- * @param header_length - The actual length of the email header
  * @param body - The email body, 0-padded at end to the MAX_EMAIL_BODY_LENGTH
- * @param body_length - The actual length of the email body
- * @param pubkey_modulus_limbs - The DKIM RSA Pubkey
- * @param redc_params_limbs - Barrett Reduction Parameter for Pubkey for efficient signature verification
+ * @param pubkey - The DKIM RSA Public Key modulus and reduction parameter
  * @param signature - The DKIM RSA Signature
+ * @param body_hash_index - The index of the body hash in the partial hash array
+ * @param dkim_header_sequence - The index and length of the DKIM header field
  * @return - 
  *         0: Pedersen hash of DKIM public key (root of trust)
  *         1: Pedersen hash of DKIM signature (email nullifier)
  */
 fn main(
+    header: BoundedVec<u8, MAX_EMAIL_HEADER_LENGTH>,
+    body: BoundedVec<u8, MAX_EMAIL_BODY_LENGTH>,
+    pubkey: RSAPubkey<KEY_LIMBS_2048>,
+    signature: [Field; KEY_LIMBS_2048],
     body_hash_index: u32,
-    header: [u8; MAX_EMAIL_HEADER_LENGTH],
-    header_length: u32,
-    body: [u8; MAX_EMAIL_BODY_LENGTH],
-    body_length: u32,
-    pubkey: [Field; KEY_LIMBS_2048],
-    pubkey_redc: [Field; KEY_LIMBS_2048],
-    signature: [Field; KEY_LIMBS_2048]
+    dkim_header_sequence: Sequence
 ) -> pub [Field; 2] {
     // check the body and header lengths are within bounds
-    assert(header_length <= MAX_EMAIL_HEADER_LENGTH);
-    assert(body_length <= MAX_EMAIL_BODY_LENGTH);
+    assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
+    assert(body.len() <= MAX_EMAIL_BODY_LENGTH);
 
+    // ~ 86,553 constraints
     // verify the dkim signature over the header
-    verify_dkim_2048(header, header_length, pubkey, pubkey_redc, signature);
+    verify_dkim_2048(header, pubkey, signature);
 
+    // ~ 6,289 constraints
     // extract the body hash from the header
-    let body_hash_encoded = get_body_hash_by_index(header, body_hash_index);
+    let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
 
-    // base64 decode the body hash
-    let signed_body_hash: [u8; 32] = body_hash_base64_decode(body_hash_encoded);
-
+    // ~ 113,962 constraints
     // hash the asserted body
-    let computed_body_hash: [u8; 32] = sha256_var(body, body_length as u64);
+    let computed_body_hash: [u8; 32] = sha256_var(body.storage, body.len() as u64);
 
     // compare the body hashes
     assert(
         signed_body_hash == computed_body_hash, "SHA256 hash computed over body does not match body hash found in DKIM-signed header"
     );
 
+    // ~ 10,255 constraints
     // hash the pubkey and signature for the standard outputs
-    standard_outputs(pubkey, signature)
+    standard_outputs(pubkey.modulus, signature)
 }

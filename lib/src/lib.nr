@@ -2,10 +2,8 @@ use dep::std::hash::pedersen_hash;
 use dep::std::collections::bounded_vec::BoundedVec;
 
 mod dkim;
-mod header_field;
+mod headers;
 mod partial_hash;
-mod base64;
-mod macro;
 mod masking;
 
 global RSA_EXPONENT: u32 = 65537;
@@ -14,42 +12,18 @@ global KEY_BYTES_2048: u32 = 256;
 global KEY_LIMBS_1024: u32 = 9;
 global KEY_LIMBS_2048: u32 = 18;
 global BODY_HASH_BASE64_LENGTH: u32 = 44;
+global CR: u8 = 0x0D;
+global LF: u8 = 0x0A;
+global MAX_DKIM_HEADER_FIELD_LENGTH: u32 = 300; // kinda arbitrary but gives > 100 chars for selector and domain
 
-struct Sequence {
-    index: u32,
-    length: u32
+pub struct RSAPubkey<let KEY_LIMBS: u32> {
+    modulus: [Field; KEY_LIMBS],
+    redc: [Field; KEY_LIMBS],
 }
 
-/**
- * Get the body hash from the header by allowing circuit input to choose index
- * @notice unsafe, can theoretically make a recipient display name = the bh
- *
- * @param HEADER_LENGTH - The length of the email header
- * @param header - The email header as validated in the DKIM signature
- * @param index - The asserted index to find the body hash at
- * @returns The base 64 encoded body hash
- */
-pub fn get_body_hash_by_index<let MAX_HEADER_LENGTH: u32>(
-    header: BoundedVec<u8; MAX_HEADER_LENGTH>,
-    body_hash_index: u32
-) -> [u8; BODY_HASH_BASE64_LENGTH] {
-    // check index range
-    assert(index >= 3, "Index does not leave room for 'bh=' prefix");
-    assert(index + BODY_HASH_BASE64_LENGTH < MAX_HEADER_LENGTH, "Index does not leave room for body hash");
-    // check for 'bh=' prefix
-    let BH_PREFIX: [u8; 3] = [98, 104, 61]; // "bh="
-    for i in 0..3 {
-        assert(header[index - 3 + i] == BH_PREFIX[i], "No 'bh=' prefix found");
-    }
-    // check for base64 suffix
-    let BH_SUFFIX: u8 = 59; // ";"
-    assert(header[index + BODY_HASH_BASE64_LENGTH] == BH_SUFFIX, "No base64 suffix found");
-    // retrieve body hash
-    let mut body_hash = [0 as u8; BODY_HASH_BASE64_LENGTH];
-    for i in 0..BODY_HASH_BASE64_LENGTH {
-        body_hash[i] = header[index + i];
-    }
-    body_hash
+pub struct Sequence {
+    index: u32,
+    length: u32
 }
 
 /**

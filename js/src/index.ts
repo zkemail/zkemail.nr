@@ -11,23 +11,34 @@ import {
   verifyDKIMSignature,
 } from "@zk-email/helpers/dist/dkim";
 import * as NoirBignum from "@mach-34/noir-bignum-paramgen";
-import { u8ToU32 } from "./utils";
+import { u8ToU32, getHeaderSequence } from "./utils";
+export { verifyDKIMSignature } from "@zk-email/helpers/dist/dkim";
 
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
-// with a few modifications for noir input generation
-// also removes some of the unused functionality like masking
+// modified for noir input generation
+
+export type Sequence = {
+  index: string;
+  length: string;
+};
+
+export type BoundedVec = {
+  storage: string[];
+  len: string;
+};
 
 export type CircuitInput = {
-  header: string[];
-  header_length: string;
-  pubkey: string[];
-  pubkey_redc: string[];
+  header: BoundedVec;
+  pubkey: {
+    modulus: string[];
+    redc: string[];
+  };
   signature: string[];
-  body?: string[];
-  body_length?: string;
-  partial_body_length?: string;
-  partial_body_hash?: string[];
+  dkim_header_sequence: Sequence;
+  body?: BoundedVec;
   body_hash_index?: string;
+  partial_body_real_length?: string;
+  partial_body_hash?: string[];
 };
 
 export type InputGenerationArgs = {
@@ -98,16 +109,19 @@ export function generateEmailVerifierInputsFromDKIMResult(
     params.maxHeadersLength || MAX_HEADER_PADDED_BYTES
   );
 
+  // set inputs used in all cases
   const circuitInputs: CircuitInput = {
-    header: Uint8ArrayToCharArray(messagePadded), // Packed into 1 byte signals
-    // modified from original: can use exact email header length
-    header_length: headers.length.toString(),
-    // modified from original: use noir bignum to format
-    pubkey: NoirBignum.bnToLimbStrArray(publicKey),
-    // not in original: add barrett reduction param for efficient rsa sig verification
-    pubkey_redc: NoirBignum.bnToRedcLimbStrArray(publicKey),
+    header: {
+      storage: Uint8ArrayToCharArray(messagePadded),
+      len: headers.length.toString(),
+    },
+    pubkey: {
+      modulus: NoirBignum.bnToLimbStrArray(publicKey),
+      redc: NoirBignum.bnToRedcLimbStrArray(publicKey),
+    },
     // modified from original: use noir bignum to format
     signature: NoirBignum.bnToLimbStrArray(signature),
+    dkim_header_sequence: getHeaderSequence(headers, "dkim-signature"),
   };
 
   // removed: header mask
@@ -130,23 +144,30 @@ export function generateEmailVerifierInputsFromDKIMResult(
       Math.max(maxBodyLength, bodySHALength)
     );
 
-    const { precomputedSha, bodyRemainingLength, ...rest } = generatePartialSHA({
-      body: bodyPadded,
-      bodyLength: bodyPaddedLen,
-      selectorString: params.shaPrecomputeSelector,
-      maxRemainingBodyLength: maxBodyLength,
-    });
+    const { precomputedSha, bodyRemainingLength, ...rest } = generatePartialSHA(
+      {
+        body: bodyPadded,
+        bodyLength: bodyPaddedLen,
+        selectorString: params.shaPrecomputeSelector,
+        maxRemainingBodyLength: maxBodyLength,
+      }
+    );
+    
     // code smell but it passes the linter
     let { bodyRemaining } = rest;
     // idk why this gets out of sync, todo: fix
-    if (params.shaPrecomputeSelector && bodyRemaining.length !== bodyRemainingLength) {
+    if (
+      params.shaPrecomputeSelector &&
+      bodyRemaining.length !== bodyRemainingLength
+    ) {
       bodyRemaining = bodyRemaining.slice(0, bodyRemainingLength);
     }
 
-    // can use exact body lengths
-    circuitInputs.body_length = body.length.toString();
+    circuitInputs.body = {
+      storage: Uint8ArrayToCharArray(bodyRemaining),
+      len: body.length.toString(),
+    };
     circuitInputs.body_hash_index = bodyHashIndex.toString();
-    circuitInputs.body = Uint8ArrayToCharArray(bodyRemaining);
 
     if (params.shaPrecomputeSelector) {
       // can use exact body lengths
@@ -154,13 +175,15 @@ export function generateEmailVerifierInputsFromDKIMResult(
       const selectorIndex = findIndexInUint8Array(body, selector);
       const shaCutoffIndex = Math.floor(selectorIndex / 64) * 64;
       const remainingBodyLength = body.length - shaCutoffIndex;
-      circuitInputs.partial_body_length = remainingBodyLength.toString();
+      circuitInputs.partial_body_real_length = body.length.toString();
+      circuitInputs.body.len = remainingBodyLength.toString();
 
       // format back into u32 so noir doesn't have to do it
       circuitInputs.partial_body_hash = Array.from(
         u8ToU32(precomputedSha)
       ).map((x) => x.toString());
     }
+
   }
 
   return circuitInputs;

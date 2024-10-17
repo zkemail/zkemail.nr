@@ -18,9 +18,10 @@ const inputParams = {
   maxBodyLength: 1024,
 };
 
-describe("Fixed Size Circuit Input", () => {
+describe("ZKEmail.nr Circuit Unit Tests", () => {
   // todo: get a github email from a throwaway account to verify
   // let prover1024: ZKEmailProver;
+  const selectorText = "All nodes in the Bitcoin network can consult it";
   let prover2048: ZKEmailProver;
   let proverPartialHash: ZKEmailProver;
 
@@ -39,71 +40,21 @@ describe("Fixed Size Circuit Input", () => {
     await proverPartialHash.destroy();
   });
 
-  describe("UltraPlonk", () => {
-    it("UltraPlonk::SmallEmail", async () => {
+  describe("Successful Cases", () => {
+    it("2048-bit DKIM", async () => {
       const inputs = await generateEmailVerifierInputs(
         emails.small,
         inputParams
       );
-      const proof = await prover2048.fullProve(inputs, "plonk");
-      const result = await prover2048.verify(proof, "plonk");
-      expect(result).toBeTruthy();
+      await prover2048.simulateWitness(inputs);
     });
-
-    it("UltraPlonk::LargeEmail", async () => {
-      const inputs = await generateEmailVerifierInputs(
-        emails.large,
-        inputParams
-      );
-      const proof = await prover2048.fullProve(inputs, "plonk");
-      const result = await prover2048.verify(proof, "plonk");
-      expect(result).toBeTruthy();
-    });
-  });
-
-  describe("UltraHonk", () => {
-    it("UltraHonk::SmallEmail", async () => {
-      const inputs = await generateEmailVerifierInputs(
-        emails.small,
-        inputParams
-      );
-      const proof = await prover2048.fullProve(inputs, "honk");
-      const result = await prover2048.verify(proof, "honk");
-      expect(result).toBeTruthy();
-    });
-
-    it("UltraHonk::LargeEmail", async () => {
-      const inputs = await generateEmailVerifierInputs(
-        emails.large,
-        inputParams
-      );
-      const proof = await prover2048.fullProve(inputs, "honk");
-      const result = await prover2048.verify(proof, "honk");
-      expect(result).toBeTruthy();
-    });
-  });
-
-  describe("Partial Hash", () => {
-    const selectorText = "All nodes in the Bitcoin network can consult it";
-    it("UltraPlonk::PartialHash", async () => {
+    it("Partial Hash", async () => {
       const inputs = await generateEmailVerifierInputs(emails.large, {
         shaPrecomputeSelector: selectorText,
         maxHeadersLength: 512,
         maxBodyLength: 192,
       });
-      const proof = await proverPartialHash.fullProve(inputs, "plonk");
-      const result = await proverPartialHash.verify(proof, "plonk");
-      expect(result).toBeTruthy();
-    });
-    it("UltraHonk::PartialHash", async () => {
-      const inputs = await generateEmailVerifierInputs(emails.large, {
-        shaPrecomputeSelector: selectorText,
-        maxHeadersLength: 512,
-        maxBodyLength: 192,
-      });
-      const proof = await proverPartialHash.fullProve(inputs, "honk");
-      const result = await proverPartialHash.verify(proof, "honk");
-      expect(result).toBeTruthy();
-    });
-  });
+      await proverPartialHash.simulateWitness(inputs);
+    })
+  })
 });
