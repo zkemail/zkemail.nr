@@ -60,6 +60,12 @@ pub fn get_body_hash_unsafe<let MAX_HEADER_LENGTH: u32>(
     base64_encode::<BODY_HASH_BASE64_LENGTH, 32>(body_hash_encoded)
 }
 
+pub fn get_email_address<let MAX_HEADER_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    from_header_field_sequence: Sequence,
+
+)
+
 /**
  * Constrains a header field to be within 
  */
@@ -119,4 +125,71 @@ pub fn constrain_header_field<
             );
         }
     }
+}
+
+/**
+ * Constrains a header field to be within 
+ */
+pub fn constrain_header_field_detect_last_angle_bracket<
+    let MAX_HEADER_LENGTH: u32,
+    let MAX_HEADER_FIELD_LENGTH: u32,
+    let HEADER_FIELD_NAME_LENGTH: u32,
+>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    header_field_sequence: Sequence,
+    header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
+) -> u32 {
+    // check that the sequence is within bounds
+    assert(
+        header_field_sequence.index + header_field_sequence.length <= header.len(),
+        "Header field out of bounds"
+    );
+    // check the range of the sequence is within the header (so we can use get_unchecked)
+    let end_index = header_field_sequence.index + header_field_sequence.length;
+    assert(end_index <= header.len(), "Header field out of bounds of header");
+
+    // if the sequence is not the start, check for a newline
+    if header_field_sequence.index != 0 {
+        assert(header.get_unchecked(header_field_sequence.index - 2) == CR, "Header field must start with CRLF");
+        assert(header.get_unchecked(header_field_sequence.index - 1) == LF, "Header field must start with CRLF");
+    }
+    // if the sequence is not the end, check for a newline
+    if end_index != header.len() {
+        assert(
+            header.get_unchecked(end_index) == CR,
+            "Header field must end with CRLF"
+        );
+        assert(header.get_unchecked(end_index + 1) == LF,
+            "Header field must end with CRLF"
+        );
+    }
+    // check that the header field name matches the expected name
+    for i in 0..HEADER_FIELD_NAME_LENGTH {
+        assert(
+            header.get_unchecked(header_field_sequence.index + i) == header_field_name[i],
+            "Header field name does not match"
+        );
+    }
+    assert(
+        header.get_unchecked(header_field_sequence.index + HEADER_FIELD_NAME_LENGTH) == 0x3a,
+        "Header field name must be followed by a colon"
+    );
+    // check the header field is uninterrupted
+    let mut last_angle_bracket = 0;
+    let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
+    for i in (HEADER_FIELD_NAME_LENGTH + 1)..MAX_HEADER_FIELD_LENGTH {
+        // is it safe enough to cut this constraint cost in half by not checking lf? i think so
+        let index = start_index + i;
+        if (index < header_field_sequence.index + header_field_sequence.length) {
+            let byte = header.get_unchecked(index);
+            assert(
+                byte != CR,
+                "Header field must not contain newlines"
+            );
+            if byte == 0x3c {
+                last_angle_bracket = index;
+            }
+        }
+    }
+    last_angle_bracket
 }

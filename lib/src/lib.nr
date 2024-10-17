@@ -15,6 +15,7 @@ global BODY_HASH_BASE64_LENGTH: u32 = 44;
 global CR: u8 = 0x0D;
 global LF: u8 = 0x0A;
 global MAX_DKIM_HEADER_FIELD_LENGTH: u32 = 300; // kinda arbitrary but gives > 100 chars for selector and domain
+global MAX_EMAIL_ADDRESS_LENGTH: u32 = 320;
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
     modulus: [Field; KEY_LIMBS],
