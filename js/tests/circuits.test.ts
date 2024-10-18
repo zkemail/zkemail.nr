@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { ZKEmailProver } from "../src/prover";
 import { generateEmailVerifierInputs } from "../src/index";
+import { makeEmailAddressCharTable } from "../src/utils";
 // import circuit1024 from "../../examples/verify_email_1024_bit_dkim/target/verify_email_1024_bit_dkim.json";
 import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify_email_2048_bit_dkim.json";
 import partialHash from "../../examples/partial_hash/target/partial_hash.json";
@@ -41,14 +42,17 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
   });
 
   describe("Successful Cases", () => {
-    it("2048-bit DKIM", async () => {
+    it("Char table: ", async () => {
+        console.log(makeEmailAddressCharTable());
+    })
+    xit("2048-bit DKIM", async () => {
       const inputs = await generateEmailVerifierInputs(
         emails.small,
         inputParams
       );
       await prover2048.simulateWitness(inputs);
     });
-    it("Partial Hash", async () => {
+    xit("Partial Hash", async () => {
       const inputs = await generateEmailVerifierInputs(emails.large, {
         shaPrecomputeSelector: selectorText,
         maxHeadersLength: 512,

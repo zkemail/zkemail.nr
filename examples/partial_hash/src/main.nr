@@ -1,6 +1,6 @@
 use dep::zkemail::{
-    KEY_LIMBS_2048, dkim::verify_dkim_2048, headers::get_body_hash,
-    partial_hash::partial_sha256_var_end, standard_outputs, Sequence, RSAPubkey
+    KEY_LIMBS_2048, dkim::RSAPubkey, headers::get_body_hash,
+    partial_hash::partial_sha256_var_end, standard_outputs, Sequence
 };
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
@@ -38,7 +38,7 @@ fn main(
     assert(body.len() <= MAX_PARTIAL_EMAIL_BODY_LENGTH, "Partial email body length exceeds maximum length");
     
     // verify the dkim signature over the header
-    verify_dkim_2048(header, pubkey, signature);
+    pubkey.verify_dkim_signature(header, signature);
 
     // manually extract the body hash from the header
     let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);

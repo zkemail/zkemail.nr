@@ -1,6 +1,6 @@
 use dep::zkemail::{
-    KEY_LIMBS_2048, dkim::verify_dkim_2048, headers::get_body_hash,
-    standard_outputs, RSAPubkey, Sequence
+    KEY_LIMBS_2048, dkim::RSAPubkey, headers::get_body_hash,
+    standard_outputs, Sequence
 };
 use dep::std::{collections::bounded_vec::BoundedVec, hash::sha256_var};
 
@@ -35,7 +35,7 @@ fn main(
 
     // ~ 86,553 constraints
     // verify the dkim signature over the header
-    verify_dkim_2048(header, pubkey, signature);
+    pubkey.verify_dkim_signature(header, signature);
 
     // ~ 6,289 constraints
     // extract the body hash from the header
