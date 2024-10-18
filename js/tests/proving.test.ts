@@ -40,25 +40,6 @@ describe("ZKEmail.nr E2E Tests", () => {
     await proverPartialHash.destroy();
   });
 
-  describe("Witness Generation", () => {
-    it("2048-bit DKIM", async () => {
-      const inputs = await generateEmailVerifierInputs(
-        emails.small,
-        inputParams
-      );
-      await prover2048.simulateWitness(inputs);
-    });
-    it("Partial Hash", async () => {
-      const selectorText = "All nodes in the Bitcoin network can consult it";
-      const inputs = await generateEmailVerifierInputs(emails.large, {
-        shaPrecomputeSelector: selectorText,
-        maxHeadersLength: 512,
-        maxBodyLength: 192,
-      });
-      await proverPartialHash.simulateWitness(inputs);
-    })
-  })
-
   describe("UltraPlonk", () => {
     it("UltraPlonk::SmallEmail", async () => {
       const inputs = await generateEmailVerifierInputs(

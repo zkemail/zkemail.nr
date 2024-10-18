@@ -70,6 +70,38 @@ export function getHeaderSequence(
 }
 
 /**
+ * Get the index and length of a header field as well as the address in the field
+ * @dev only works for to, from. Not set up for cc
+ *
+ * @param header - the header to search for the field in
+ * @param headerField - the field name to search for
+ * @returns - the index and length of the field in the header and the index and length of the address in the field
+ */
+export function getAddressHeaderSequence(
+  header: Buffer,
+  headerField: string
+) {
+  const regexPrefix = `[${headerField[0].toUpperCase()}${headerField[0].toLowerCase()}]${headerField
+    .slice(1)
+    .toLowerCase()}`;
+  const regex = new RegExp(
+    `${regexPrefix}:.*?<([^>]+)>|${regexPrefix}:.*?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})`
+  );
+  const headerStr = header.toString();
+  const match = headerStr.match(regex);
+  if (match === null)
+    throw new Error(`Field "${headerField}" not found in header`);
+  if (match[1] === null && match[2] === null)
+    throw new Error(`Address not found in "${headerField}" field`);
+  const address = match[1] || match[2];
+  const addressIndex = headerStr.indexOf(address);
+  return [
+    { index: match.index!.toString(), length: match[0].length.toString() },
+    { index: addressIndex.toString(), length: address.length.toString() },
+  ]
+}
+
+/**
  * Build a ROM table for allowable email characters
  */
 export function makeEmailAddressCharTable(): string {
@@ -92,13 +124,13 @@ export function makeEmailAddressCharTable(): string {
   for (let i = 0; i < procedingChars.length; i++) {
     table[procedingChars.charCodeAt(i)] = 3;
   }
-  let tableStr = `global EMAIL_ADDRESS_CHAR_TABLE: [u8; ${tableLength}] = [\n`
-  console.log()
+  let tableStr = `global EMAIL_ADDRESS_CHAR_TABLE: [u8; ${tableLength}] = [\n`;
+  console.log();
   for (let i = 0; i < table.length; i += 10) {
     const end = i + 10 < table.length ? i + 10 : table.length;
     tableStr += `    ${table.slice(i, end).join(", ")},\n`;
   }
-  return tableStr += "];";
+  return (tableStr += "];");
 }
 
 // export function computeStandardOutputs(email: Buffer): Promise<[bigint, bigint]> {

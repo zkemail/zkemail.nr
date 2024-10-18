@@ -3,4 +3,4 @@ target
 dist
 .tsbuildinfo
 zk-email-verify
-
+!*/email-*.eml

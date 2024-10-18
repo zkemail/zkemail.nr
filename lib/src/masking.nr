@@ -11,7 +11,7 @@ use dep::std::collections::bounded_vec::BoundedVec;
  */
 pub fn mask_text<let TEXT_LEN: u32>(
     text: BoundedVec<u8, TEXT_LEN>,
-    mask: [u8; TEXT_LEN],
+    mask: [bool; TEXT_LEN],
 ) -> [u8; TEXT_LEN] {
     let mut masked_text = [0; TEXT_LEN];
     // probably fine to just iterate through whole thing without an if statement

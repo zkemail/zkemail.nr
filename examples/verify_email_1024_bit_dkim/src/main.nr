@@ -1,5 +1,5 @@
 use dep::zkemail::{
-    KEY_LIMBS_1024, dkim::RSAPubkey, headers::get_body_hash,
+    KEY_LIMBS_1024, dkim::RSAPubkey, headers::body_hash::get_body_hash,
     standard_outputs, Sequence
 };
 use dep::std::{collections::bounded_vec::BoundedVec, hash::sha256_var};

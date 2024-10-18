@@ -11,7 +11,7 @@ import {
   verifyDKIMSignature,
 } from "@zk-email/helpers/dist/dkim";
 import * as NoirBignum from "@mach-34/noir-bignum-paramgen";
-import { u8ToU32, getHeaderSequence } from "./utils";
+import { u8ToU32, getHeaderSequence, getAddressHeaderSequence } from "./utils";
 export { verifyDKIMSignature } from "@zk-email/helpers/dist/dkim";
 
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
@@ -28,6 +28,7 @@ export type BoundedVec = {
 };
 
 export type CircuitInput = {
+  // required inputs for all zkemail verifications
   header: BoundedVec;
   pubkey: {
     modulus: string[];
@@ -35,12 +36,20 @@ export type CircuitInput = {
   };
   signature: string[];
   dkim_header_sequence: Sequence;
+  // inputs used for verifying full or partial hash
   body?: BoundedVec;
   body_hash_index?: string;
+  // inputs used for only partial hash
   partial_body_real_length?: string;
   partial_body_hash?: string[];
-  header_mask: string[];
-  body_mask: string[];
+  // inputs used for only masking
+  header_mask?: string[];
+  body_mask?: string[];
+  // inputs used for address extraction
+  from_header_sequence?: Sequence;
+  from_address_sequence?: Sequence;
+  to_header_sequence?: Sequence;
+  to_address_sequence?: Sequence;
 };
 
 export type InputGenerationArgs = {
@@ -51,6 +60,9 @@ export type InputGenerationArgs = {
   removeSoftLineBreaks?: boolean;
   headerMask?: number[];
   bodyMask?: number[];
+  // todo: probably move these out into a separate extended type?
+  extractFrom?: boolean;
+  extractTo?: boolean;
 };
 
 // copied without modification, but not publicly exported in original
@@ -193,6 +205,18 @@ export function generateEmailVerifierInputsFromDKIMResult(
       circuitInputs.header_mask = params.headerMask.map((x) => x.toString());
     if (params.bodyMask)
       circuitInputs.body_mask = params.bodyMask.map((x) => x.toString());
+
+    // address extraction
+    if (params.extractFrom) {
+      const fromSequences = getAddressHeaderSequence(headers, "from");
+      circuitInputs.from_header_sequence = fromSequences[0];
+      circuitInputs.from_address_sequence = fromSequences[1];
+    }
+    if (params.extractTo) {
+      const toSequences = getAddressHeaderSequence(headers, "to");
+      circuitInputs.to_header_sequence = toSequences[0];
+      circuitInputs.to_address_sequence = toSequences[1];
+    }
   }
 
   return circuitInputs;
