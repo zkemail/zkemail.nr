@@ -9,7 +9,7 @@ use crate::{Sequence, CR, LF, MAX_DKIM_HEADER_FIELD_LENGTH, BODY_HASH_BASE64_LEN
  * @param header - The email header as validated in the DKIM signature
  * @param dkim_header_field_sequence - The sequence of the DKIM header field
  * @param body_hash_index - The index of the body hash in the header
- */
+ */ 
 pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     header: BoundedVec<u8, MAX_HEADER_LENGTH>,
     dkim_header_field_sequence: Sequence,
