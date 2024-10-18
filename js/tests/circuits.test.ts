@@ -8,7 +8,6 @@ import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify
 import circuitPartialHash from "../../examples/partial_hash/target/partial_hash.json";
 import circuitEmailMask from "../../examples/email_mask/target/email_mask.json";
 import circuitExtractAddresses from "../../examples/extract_addresses/target/extract_addresses.json";
-import exp from "constants";
 
 const emails = {
   small: fs.readFileSync(path.join(__dirname, "./test-data/email-good.eml")),
