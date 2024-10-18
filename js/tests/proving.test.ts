@@ -25,149 +25,201 @@ describe("ZKEmail.nr E2E Tests", () => {
   // todo: get a github email from a throwaway account to verify
   // let prover1024: ZKEmailProver;
   const selectorText = "All nodes in the Bitcoin network can consult it";
-  let prover2048: ZKEmailProver;
-  let proverPartialHash: ZKEmailProver;
-  let proverMasked: ZKEmailProver;
-  let proverExtractAddresses: ZKEmailProver;
 
-  beforeAll(() => {
-    //@ts-ignore
-    // prover1024 = new ZKEmailProver(circuit1024, "all");
-    //@ts-ignore
-    prover2048 = new ZKEmailProver(circuit2048, "all");
-    //@ts-ignore
-    proverPartialHash = new ZKEmailProver(circuitPartialHash, "all");
-    //@ts-ignore
-    proverMasked = new ZKEmailProver(circuitEmailMask, "all");
-    //@ts-ignore
-    proverExtractAddresses = new ZKEmailProver(circuitExtractAddresses, "all");
-  });
-
-  afterAll(async () => {
-    // await prover1024.destroy();
-    await prover2048.destroy();
-    await proverPartialHash.destroy();
-    await proverMasked.destroy();
-    await proverExtractAddresses.destroy();
-  });
-
-  describe("UltraPlonk", () => {
-    it("UltraPlonk::SmallEmail", async () => {
-      const inputs = await generateEmailVerifierInputs(
-        emails.small,
-        inputParams
-      );
-      const proof = await prover2048.fullProve(inputs, "plonk");
-      const result = await prover2048.verify(proof, "plonk");
-      expect(result).toBeTruthy();
-    });
-
-    it("UltraPlonk::LargeEmail", async () => {
-      const inputs = await generateEmailVerifierInputs(
-        emails.large,
-        inputParams
-      );
-      const proof = await prover2048.fullProve(inputs, "plonk");
-      const result = await prover2048.verify(proof, "plonk");
-      expect(result).toBeTruthy();
-    });
-    it("UltraPlonk::PartialHash", async () => {
-      const inputs = await generateEmailVerifierInputs(emails.large, {
-        shaPrecomputeSelector: selectorText,
-        maxHeadersLength: 512,
-        maxBodyLength: 192,
+  describe("2048-bit circuit", () => {
+    let prover: ZKEmailProver;
+    describe("UltraPlonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuit2048, "plonk");
       });
-      const proof = await proverPartialHash.fullProve(inputs, "plonk");
-      const result = await proverPartialHash.verify(proof, "plonk");
-      expect(result).toBeTruthy();
-    });
-    it("UltraPlonk::Masked", async () => {
-      // make masks
-      const headerMask = Array.from(
-        { length: inputParams.maxHeadersLength },
-        () => Math.floor(Math.random() * 2)
-      );
-      const bodyMask = Array.from({ length: inputParams.maxBodyLength }, () =>
-        Math.floor(Math.random() * 2)
-      );
-      const inputs = await generateEmailVerifierInputs(emails.small, {
-        headerMask,
-        bodyMask,
-        ...inputParams,
+      afterAll(async () => {
+        prover.destroy();
       });
-      const proof = await proverMasked.fullProve(inputs, "plonk");
-      const result = await proverMasked.verify(proof, "plonk");
-      expect(result).toBeTruthy();
-    });
-    it("UltraPlonk::ExtractAddresses", async () => {
-      const inputs = await generateEmailVerifierInputs(emails.small, {
-        extractFrom: true,
-        extractTo: true,
-        ...inputParams,
+      it("Small Email", async () => {
+        const inputs = await generateEmailVerifierInputs(
+          emails.small,
+          inputParams
+        );
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
       });
-      const proof = await proverExtractAddresses.fullProve(inputs, "plonk");
-      const result = await proverExtractAddresses.verify(proof, "plonk");
-      expect(result).toBeTruthy();
+      it("Large Email", async () => {
+        const inputs = await generateEmailVerifierInputs(
+          emails.large,
+          inputParams
+        );
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
+    });
+    describe("UltraHonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuit2048, "honk");
+      });
+      afterAll(async () => {
+        prover.destroy();
+      });
+      it("Small Email", async () => {
+        const inputs = await generateEmailVerifierInputs(
+          emails.small,
+          inputParams
+        );
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
+      it("Large Email", async () => {
+        const inputs = await generateEmailVerifierInputs(
+          emails.large,
+          inputParams
+        );
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
     });
   });
-
-  describe("UltraHonk", () => {
-    it("UltraHonk::SmallEmail", async () => {
-      const inputs = await generateEmailVerifierInputs(
-        emails.small,
-        inputParams
-      );
-      const proof = await prover2048.fullProve(inputs, "honk");
-      const result = await prover2048.verify(proof, "honk");
-      expect(result).toBeTruthy();
-    });
-
-    it("UltraHonk::LargeEmail", async () => {
-      const inputs = await generateEmailVerifierInputs(
-        emails.large,
-        inputParams
-      );
-      const proof = await prover2048.fullProve(inputs, "honk");
-      const result = await prover2048.verify(proof, "honk");
-      expect(result).toBeTruthy();
-    });
-    it("UltraHonk::PartialHash", async () => {
-      const inputs = await generateEmailVerifierInputs(emails.large, {
-        shaPrecomputeSelector: selectorText,
-        maxHeadersLength: 512,
-        maxBodyLength: 192,
+  describe("Partial Hash Circuit", () => {
+    let prover: ZKEmailProver;
+    describe("UltraPlonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuitPartialHash, "plonk");
       });
-      const proof = await proverPartialHash.fullProve(inputs, "honk");
-      const result = await proverPartialHash.verify(proof, "phonklonk");
-      expect(result).toBeTruthy();
-    });
-    it("UltraHonk::Masked", async () => {
-      // make masks
-      const headerMask = Array.from(
-        { length: inputParams.maxHeadersLength },
-        () => Math.floor(Math.random() * 2)
-      );
-      const bodyMask = Array.from({ length: inputParams.maxBodyLength }, () =>
-        Math.floor(Math.random() * 2)
-      );
-      const inputs = await generateEmailVerifierInputs(emails.small, {
-        headerMask,
-        bodyMask,
-        ...inputParams,
+      afterAll(async () => {
+        prover.destroy();
       });
-      const proof = await proverMasked.fullProve(inputs, "honk");
-      const result = await proverMasked.verify(proof, "honk");
-      expect(result).toBeTruthy();
-    });
-    it("UltraHonk::ExtractAddresses", async () => {
-      const inputs = await generateEmailVerifierInputs(emails.small, {
-        extractFrom: true,
-        extractTo: true,
-        ...inputParams,
+      it("Partial Hash", async () => {
+        const inputs = await generateEmailVerifierInputs(emails.large, {
+          shaPrecomputeSelector: selectorText,
+          maxHeadersLength: 512,
+          maxBodyLength: 192,
+        });
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
       });
-      const proof = await proverExtractAddresses.fullProve(inputs, "honk");
-      const result = await proverExtractAddresses.verify(proof, "honk");
-      expect(result).toBeTruthy();
+    });
+    describe("UltraHonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuitPartialHash, "honk");
+      });
+      afterAll(async () => {
+        prover.destroy();
+      });
+      it("Partial Hash", async () => {
+        const inputs = await generateEmailVerifierInputs(emails.large, {
+          shaPrecomputeSelector: selectorText,
+          maxHeadersLength: 512,
+          maxBodyLength: 192,
+        });
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
+    });
+  });
+  describe("Masking Circuit", () => {
+    let prover: ZKEmailProver;
+    describe("UltraPlonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuitEmailMask, "plonk");
+      });
+      afterAll(async () => {
+        prover.destroy();
+      });
+      it("Masking", async () => {
+        // make masks
+        const headerMask = Array.from(
+          { length: inputParams.maxHeadersLength },
+          () => Math.floor(Math.random() * 2)
+        );
+        const bodyMask = Array.from({ length: inputParams.maxBodyLength }, () =>
+          Math.floor(Math.random() * 2)
+        );
+        const inputs = await generateEmailVerifierInputs(emails.small, {
+          headerMask,
+          bodyMask,
+          ...inputParams,
+        });
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
+    });
+    describe("UltraHonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuitEmailMask, "honk");
+      });
+      afterAll(async () => {
+        prover.destroy();
+      });
+      it("Masking", async () => {
+        // make masks
+        const headerMask = Array.from(
+          { length: inputParams.maxHeadersLength },
+          () => Math.floor(Math.random() * 2)
+        );
+        const bodyMask = Array.from({ length: inputParams.maxBodyLength }, () =>
+          Math.floor(Math.random() * 2)
+        );
+        const inputs = await generateEmailVerifierInputs(emails.small, {
+          headerMask,
+          bodyMask,
+          ...inputParams,
+        });
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
+    });
+  });
+  describe("Address Extraction Circuit", () => {
+    let prover: ZKEmailProver;
+    describe("UltraPlonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuitExtractAddresses, "plonk");
+      });
+      afterAll(async () => {
+        prover.destroy();
+      });
+      it("Address Extraction", async () => {
+        const inputs = await generateEmailVerifierInputs(emails.small, {
+          extractFrom: true,
+          extractTo: true,
+          ...inputParams,
+        });
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
+    });
+    describe("UltraHonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuitExtractAddresses, "honk");
+      });
+      afterAll(async () => {
+        prover.destroy();
+      });
+      it("Address Extraction", async () => {
+        const inputs = await generateEmailVerifierInputs(emails.small, {
+          extractFrom: true,
+          extractTo: true,
+          ...inputParams,
+        });
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
     });
   });
 });
