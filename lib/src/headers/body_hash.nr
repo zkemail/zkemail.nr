@@ -23,7 +23,7 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     // constrain access to the body hash
     assert(
         body_hash_index > dkim_header_field_sequence.index
-        & body_hash_index < dkim_header_field_sequence.index + dkim_header_field_sequence.length, "Body hash index accessed outside of DKIM header field"
+        & body_hash_index < dkim_header_field_sequence.end_index(), "Body hash index accessed outside of DKIM header field"
     );
     let bh_prefix: [u8; 3] = comptime {
         "bh=".as_bytes()

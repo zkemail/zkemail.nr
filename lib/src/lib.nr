@@ -1,7 +1,4 @@
-use dep::std::{
-    hash::pedersen_hash,
-    collections::bounded_vec::BoundedVec,
-};
+use dep::std::{hash::pedersen_hash, collections::bounded_vec::BoundedVec};
 use crate::dkim::RSAPubkey;
 
 mod dkim;
@@ -21,12 +18,16 @@ global LF: u8 = 0x0A;
 global MAX_DKIM_HEADER_FIELD_LENGTH: u32 = 300; // kinda arbitrary but gives > 100 chars for selector and domain
 global MAX_EMAIL_ADDRESS_LENGTH: u32 = 320;
 
-
 pub struct Sequence {
     index: u32,
     length: u32
 }
 
+impl Sequence {
+    pub fn end_index(self) -> u32 {
+        self.index + self.length
+    }
+}
 // allowable chars in an email address (js/src/utils:makeAllowableEmailCharsTable()
 // "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-@" = 1
 // "<: " = 2
@@ -86,7 +87,7 @@ pub fn verify_email<
 >(
     header: BoundedVec<u8, MAX_EMAIL_HEADER_LENGTH>,
     pubkey: RSAPubkey<KEY_LIMBS_2048>,
-    signature: [Field; KEY_LIMBS_2048],
+    signature: [Field; KEY_LIMBS_2048]
 ) {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);

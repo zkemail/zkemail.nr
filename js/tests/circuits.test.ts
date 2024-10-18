@@ -8,6 +8,7 @@ import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify
 import circuitPartialHash from "../../examples/partial_hash/target/partial_hash.json";
 import circuitEmailMask from "../../examples/email_mask/target/email_mask.json";
 import circuitExtractAddresses from "../../examples/extract_addresses/target/extract_addresses.json";
+import exp from "constants";
 
 const emails = {
   small: fs.readFileSync(path.join(__dirname, "./test-data/email-good.eml")),
@@ -53,17 +54,14 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
   });
 
   describe("Successful Cases", () => {
-    // it("Char table: ", async () => {
-    //     console.log(makeEmailAddressCharTable());
-    // })
-    xit("2048-bit DKIM", async () => {
+    it("2048-bit DKIM", async () => {
       const inputs = await generateEmailVerifierInputs(
         emails.small,
         inputParams
       );
       await prover2048.simulateWitness(inputs);
     });
-    xit("Partial Hash", async () => {
+    it("Partial Hash", async () => {
       const inputs = await generateEmailVerifierInputs(emails.large, {
         shaPrecomputeSelector: selectorText,
         maxHeadersLength: 512,
@@ -71,7 +69,7 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       });
       await proverPartialHash.simulateWitness(inputs);
     });
-    xit("Masked Header/ Body", async () => {
+    it("Masked Header/ Body", async () => {
       // make masks
       const headerMask = Array.from(
         { length: inputParams.maxHeadersLength },
@@ -105,24 +103,41 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       expect(expectedMaskedBody).toEqual(acutalMaskedBody);
     });
     it("Extract Sender/ Recipient", async () => {
-        const inputs = await generateEmailVerifierInputs(emails.small, {
-            extractFrom: true,
-            extractTo: true,
-            ...inputParams,
-        });
-        console.log()
-        // simulate witness
-        // const result = await proverExtractAddresses.simulateWitness(inputs);
-        // console.log("result: ", result.returnValue);
-        // // parse expected addresses
-        // const header = Buffer.from(inputs.header.storage.map((byte) => parseInt(byte))).toString();
-        // const fromAddressStart = parseInt(inputs.from_adddres_sequence!.index);
-        // const fromAddressEnd = fromAddressStart + parseInt(inputs.from_adddres_sequence!.length);
-        // const from = header.slice(fromAddressStart, fromAddressEnd);
-        // const toAddressStart = parseInt(inputs.to_address_sequence!.index);
-        // const toAddressEnd = toAddressStart + parseInt(inputs.to_address_sequence!.length);
-        // const to = header.slice(toAddressStart, toAddressEnd);
-
+      const inputs = await generateEmailVerifierInputs(emails.small, {
+        extractFrom: true,
+        extractTo: true,
+        ...inputParams,
+      });
+      // simulate witness
+      const result = await proverExtractAddresses.simulateWitness(inputs);
+      // parse expected addresses
+      const header = Buffer.from(
+        inputs.header.storage.map((byte) => parseInt(byte))
+      ).toString();
+      const fromAddressStart = parseInt(inputs.from_address_sequence!.index);
+      const fromAddressEnd =
+        fromAddressStart + parseInt(inputs.from_address_sequence!.length);
+      const expectedFrom = header.slice(fromAddressStart, fromAddressEnd);
+      const toAddressStart = parseInt(inputs.to_address_sequence!.index);
+      const toAddressEnd =
+        toAddressStart + parseInt(inputs.to_address_sequence!.length);
+      const expectedTo = header.slice(toAddressStart, toAddressEnd);
+      // parse actual addresses
+      const parseSequence = (len: string, storage: string[]) => {
+        return Buffer.from(
+          storage.slice(0, parseInt(len)).map((byte) => parseInt(byte))
+        ).toString();
+      };
+      const actualFrom = parseSequence(
+        result.returnValue[1].len,
+        result.returnValue[1].storage
+      );
+      const actualTo = parseSequence(
+        result.returnValue[2].len,
+        result.returnValue[2].storage
+      );
+      expect(expectedFrom).toEqual(actualFrom);
+      expect(expectedTo).toEqual(actualTo);
     });
   });
 });
