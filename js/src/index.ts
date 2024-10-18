@@ -11,21 +11,18 @@ import {
   verifyDKIMSignature,
 } from "@zk-email/helpers/dist/dkim";
 import * as NoirBignum from "@mach-34/noir-bignum-paramgen";
-import { u8ToU32, getHeaderSequence, getAddressHeaderSequence } from "./utils";
+import {
+  u8ToU32,
+  getHeaderSequence,
+  getAddressHeaderSequence,
+  Sequence,
+  BoundedVec,
+} from "./utils";
+
 export { verifyDKIMSignature } from "@zk-email/helpers/dist/dkim";
 
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
 // modified for noir input generation
-
-export type Sequence = {
-  index: string;
-  length: string;
-};
-
-export type BoundedVec = {
-  storage: string[];
-  len: string;
-};
 
 export type CircuitInput = {
   // required inputs for all zkemail verifications
@@ -201,10 +198,8 @@ export function generateEmailVerifierInputsFromDKIMResult(
     }
 
     // masking
-    if (params.headerMask)
-      circuitInputs.header_mask = params.headerMask.map((x) => x.toString());
-    if (params.bodyMask)
-      circuitInputs.body_mask = params.bodyMask.map((x) => x.toString());
+    if (params.headerMask) circuitInputs.header_mask = params.headerMask.map((x) => x.toString());
+    if (params.bodyMask) circuitInputs.body_mask = params.bodyMask.map((x) => x.toString());
 
     // address extraction
     if (params.extractFrom) {

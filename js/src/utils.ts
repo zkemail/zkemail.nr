@@ -1,5 +1,12 @@
-import { Sequence } from "./index";
+export type Sequence = {
+  index: string;
+  length: string;
+};
 
+export type BoundedVec = {
+  storage: string[];
+  len: string;
+};
 /**
  * Transforms a u32 array to a u8 array
  * @dev sha-utils in zk-email-verify encodes partial hash as u8 array but noir expects u32
@@ -64,8 +71,7 @@ export function getHeaderSequence(
       .toLowerCase()}:.*(?:\r?\n)?`
   );
   const match = header.toString().match(regex);
-  if (match === null)
-    throw new Error(`Field "${headerField}" not found in header`);
+  if (match === null) throw new Error(`Field "${headerField}" not found in header`);
   return { index: match.index!.toString(), length: match[0].length.toString() };
 }
 
@@ -85,20 +91,18 @@ export function getAddressHeaderSequence(
     .slice(1)
     .toLowerCase()}`;
   const regex = new RegExp(
-    `${regexPrefix}:.*?<([^>]+)>|${regexPrefix}:.*?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})`
+    `${regexPrefix}:.*?<([^>]+)>|${regexPrefix}:.*?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,})`
   );
   const headerStr = header.toString();
   const match = headerStr.match(regex);
-  if (match === null)
-    throw new Error(`Field "${headerField}" not found in header`);
-  if (match[1] === null && match[2] === null)
-    throw new Error(`Address not found in "${headerField}" field`);
+  if (match === null) throw new Error(`Field "${headerField}" not found in header`);
+  if (match[1] === null && match[2] === null) throw new Error(`Address not found in "${headerField}" field`);
   const address = match[1] || match[2];
   const addressIndex = headerStr.indexOf(address);
   return [
     { index: match.index!.toString(), length: match[0].length.toString() },
     { index: addressIndex.toString(), length: address.length.toString() },
-  ]
+  ];
 }
 
 /**
@@ -130,7 +134,8 @@ export function makeEmailAddressCharTable(): string {
     const end = i + 10 < table.length ? i + 10 : table.length;
     tableStr += `    ${table.slice(i, end).join(", ")},\n`;
   }
-  return (tableStr += "];");
+  tableStr += "];";
+  return tableStr;
 }
 
 // export function computeStandardOutputs(email: Buffer): Promise<[bigint, bigint]> {
