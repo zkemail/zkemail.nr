@@ -39,14 +39,18 @@ export type CircuitInput = {
   body_hash_index?: string;
   partial_body_real_length?: string;
   partial_body_hash?: string[];
+  header_mask: string[];
+  body_mask: string[];
 };
 
 export type InputGenerationArgs = {
   ignoreBodyHashCheck?: boolean;
   shaPrecomputeSelector?: string;
-  maxHeadersLength?: number; // Max length of the email header including padding
-  maxBodyLength?: number; // Max length of the email body after shaPrecomputeSelector including padding
+  maxHeadersLength?: number;
+  maxBodyLength?: number;
   removeSoftLineBreaks?: boolean;
+  headerMask?: number[];
+  bodyMask?: number[];
 };
 
 // copied without modification, but not publicly exported in original
@@ -152,7 +156,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
         maxRemainingBodyLength: maxBodyLength,
       }
     );
-    
+
     // code smell but it passes the linter
     let { bodyRemaining } = rest;
     // idk why this gets out of sync, todo: fix
@@ -179,11 +183,16 @@ export function generateEmailVerifierInputsFromDKIMResult(
       circuitInputs.body.len = remainingBodyLength.toString();
 
       // format back into u32 so noir doesn't have to do it
-      circuitInputs.partial_body_hash = Array.from(
-        u8ToU32(precomputedSha)
-      ).map((x) => x.toString());
+      circuitInputs.partial_body_hash = Array.from(u8ToU32(precomputedSha)).map(
+        (x) => x.toString()
+      );
     }
 
+    // masking
+    if (params.headerMask)
+      circuitInputs.header_mask = params.headerMask.map((x) => x.toString());
+    if (params.bodyMask)
+      circuitInputs.body_mask = params.bodyMask.map((x) => x.toString());
   }
 
   return circuitInputs;
