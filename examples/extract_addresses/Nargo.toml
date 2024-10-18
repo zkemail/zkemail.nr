@@ -1,5 +1,5 @@
 [package]
-name = "partial_hash"
+name = "extract_addresses"
 type = "bin"
 authors = ["Mach 34"]
 compiler_version = ">=0.35.0"
