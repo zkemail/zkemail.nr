@@ -8,7 +8,7 @@ mod dkim;
 mod headers;
 mod partial_hash;
 mod masking;
-mod macro;
+// mod macro;
 
 global RSA_EXPONENT: u32 = 65537;
 global KEY_BYTES_1024: u32 = 128;
