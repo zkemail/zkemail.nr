@@ -248,6 +248,40 @@ pub fn partial_sha256_var_end<let N: u32>(mut h: [u32; 8], msg: [u8; N], message
     hash_final_block(msg_block, h)
 }
 
+pub fn partial_hash_sha256_interstitial<let N: u32>(mut h: [u32; 8], msg: [u8; N]) -> [u32; 8] {
+    let num_blocks = N / BLOCK_SIZE;
+    let mut msg_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+    let mut msg_byte_ptr = 0; // Pointer into msg_block
+
+    for i in 0..num_blocks {
+        let msg_start = BLOCK_SIZE * i;
+        let (new_msg_block, new_msg_byte_ptr) = unsafe {
+            build_msg_block_iter(msg, N, msg_start)
+        };
+        if msg_start < N {
+            msg_block = new_msg_block;
+        }
+
+        if !is_unconstrained() {
+            // Verify the block we are compressing was appropriately constructed
+            let new_msg_byte_ptr = verify_msg_block(msg, N, msg_block, msg_start);
+            if msg_start < N {
+                msg_byte_ptr = new_msg_byte_ptr;
+            }
+        } else if msg_start < N {
+            msg_byte_ptr = new_msg_byte_ptr;
+        }
+
+        // If the block is filled, compress it.
+        // An un-filled block is handled after this loop.
+        if (msg_start < N) & (msg_byte_ptr == BLOCK_SIZE) {
+            h = sha256_compression(msg_u8_to_u32(msg_block), h);
+        }
+    }
+
+    h
+}
+
 unconstrained fn pad_msg_block(
     mut msg_block: [u8; BLOCK_SIZE],
     mut msg_byte_ptr: u32
@@ -298,7 +332,7 @@ fn hash_final_block(msg_block: [u8; BLOCK_SIZE], mut state: [u32; 8]) -> [u8; 32
     out_h
 }
 
-// #[test]
+#[test]
 fn test_partial_hash() {
     let data = [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
@@ -322,6 +356,35 @@ fn test_partial_hash() {
     }
     let state = partial_sha256_var_start(data0);
     let hash = partial_sha256_var_end(state, data1, data1.len() as u64, data.len() as u64);
+    let correct_hash = std::hash::sha256_var(data, data.len() as u64);
+    assert_eq(hash, correct_hash);
+}
+
+#[test]
+fn test_partial_hash_interstitial() {
+    let data = [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+        48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
+        71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93,
+        94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
+        113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130,
+        131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148,
+        149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166,
+        167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184,
+        185, 186, 187, 188, 189, 190, 191
+    ];
+    let mut data0 = [0; 64];
+    let mut data1 = [0; 64];
+    let mut data2 = [0; 64];
+    for i in 0..data0.len() {
+        data0[i] = data[i];
+        data1[i] = data[64 + i];
+        data2[i] = data[128 + i];
+    }
+    let pre_hash = partial_sha256_var_start(data0);
+    let interstitial_hash = partial_hash_sha256_interstitial(pre_hash, data1);
+    let hash = partial_sha256_var_end(interstitial_hash, data2, data2.len() as u64, data.len() as u64);
     let correct_hash = std::hash::sha256_var(data, data.len() as u64);
     assert_eq(hash, correct_hash);
 }
