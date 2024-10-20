@@ -5,20 +5,21 @@ ZKEmail written in [NoirLang](https://noir-lang.org/)
 
 In your Nargo.toml file, add the version of this library you would like to install under dependency:
 
-```
+```toml
 [dependencies]
-zkemail = { tag = "v0.3.1", git = "https://github.com/zkemail/zkemail.nr", directory = "lib" }
+zkemail = { tag = "v0.3.2", git = "https://github.com/zkemail/zkemail.nr", directory = "lib" }
 ```
 
 The library exports the following functions:
-- `verify_dkim_1024` and `verify_dkim_2048` -  for verifying DKIM signatures over an email header. This is needed for all email verifications.
-- `get_body_hash_by_index` - to get the body hash from the header.
-- `body_hash_base64_decode` - to decode the body hash from the header.
-- Above two methods are needed to verify the body hash of an email. This is only needed if you want to contrain something over the email body.
+- `dkim::RSAPubkey::verify_dkim_signature` -  for verifying DKIM signatures over an email header. This is needed for all email verifications.
+- `headers::body_hash::get_body_hash` - constrained access and decoding of the body hash from the header
+- `headers::email_address::get_email_address` - constrained extraction of to or from email addresses
+- `partial_hash::partial_sha256_var_end` - finish a precomputed sha256 hash over the body
+- `masking::mask_text` - apply a byte mask to the header or body to selectively reveal parts of the entire email
 - `standard_outputs` - returns the hash of the DKIM pubkey and a nullifier for the email (`hash(signature)`)
 
 
-```
+```rust
 use dep::zkemail::{
     KEY_LIMBS_1024, dkim::verify_dkim_1024, get_body_hash_by_index,     
     base64::body_hash_base64_decode, standard_outputs
@@ -42,11 +43,11 @@ use dep::std::hash::sha256_var;
 
 ### Usage with partial SHA
 
-You can use partial hashing technique for email with large body when the part you want to contrain in the body is towards the end.
+You can use partial hashing technique for email with large body when the part you want to constrain in the body is towards the end.
 
 Since SHA works in chunks of 64 bytes, we can hash the body up to the chunk from where we want to extract outside of the circuit and do the remaining hash in the circuit. This will save a lot of constraints as SHA is very expensive in circuit.
 
-```
+```rust
 use dep::zkemail::{
     KEY_LIMBS_2048, dkim::verify_dkim_2048, get_body_hash_by_index,
     partial_hash::partial_sha256_var_end, base64::body_hash_base64_decode,
@@ -70,25 +71,37 @@ use dep::zkemail::{
 ...
 ```
 
-Find more examples in the [examples](./examples) folder.
+### Extracting Email Addresses
+
+In the header, email addresses can appear in a variety of formats: 
+ * `"name" <local-part@domain.com>`
+ * `name <local-part@domain.com>`
+ * `name local-part@domain.com`
+ * `local-part@domain.com`
+Without regex, we take a slightly different approach. 
+
+
+Find examples of each implementation in the [examples](./examples) folder.
 
 
 ## Using the Input Generation JS Library
 
 Install the library:
-```
+```console
 yarn add @mach-34/zkemail-nr
 ```
 
 ### Usage
+See the [witness simulation](./js/tests/circuits.test.ts) and [proving](./js/tests/proving.test.ts) tests for an in-depth demonstration of each use case.
 
-```
+```js
+// example of generating inputs for a partial hash
 import { generateEmailVerifierInputs } from "@mach-34/zkemail-nr";
 
 const zkEmailInputs = await generateEmailVerifierInputs(emailContent, {
-  maxBodyLength: 1280, // Same as MAX_PARTIAL_EMAIL_BODY_LENGTH in circuit
-  maxHeadersLength: 1408, // Same as MAX_EMAIL_HEADER_LENGTH in circuit
-  shaPrecomputeSelector: "some string in body up to which you want to hash outside circuit", // if you want to use partial hashing
+  maxBodyLength: 1280,
+  maxHeadersLength: 1408,
+  shaPrecomputeSelector: "some string in body up to which you want to hash outside circuit",
 });
 
 ```
@@ -102,13 +115,27 @@ TODO
 ## Todo
  - Negative Unit Testing
  - Expected InputGen testing
- - Robust from/ to string search implementation
- - Contract/ testing for UltraPlonk reintegrated
  - EVM Contract tests for email integration
  - Aztec Contract tests for email integration
  - 1024-bit key demo eml (current one is sensitive and cannot be provided in public repo)
- - DKIM Key pedersen hash function
- - Handle optional inputs (partial hashing, no body check, etc) gracefully again
- - Partial SHA256 hashing
- - Implementation with Regex 
- - test does not exit on completion?
+ - Implementation with Regex
+ - Add constraint estimations and benchmarking
+ - Add native proving scripts
+ - Macro Impl
+
+### Proposed Macro Impl
+```rust
+// zkemail attribute would automatically inject fields
+// header: BoundedVec<u8, MAX_HEADER_LEN>,
+// pubkey: RSAPubkey<KEY_LIMBS>,
+// signature: [Field; KEY_LIMBS]
+// and add range check header.len() + pubkey::verify_rsa_signature
+// it then would add additional necessary fields for each trait, add the 
+#[zkemail(PartialHash, From, DKIMHash, Nullifier)]
+let Input<let MAX_HEADER_LENGTH: u32, let MAX_BODY_LEN: u32, let KEY_LIMBS: u32> {};
+//fn main(input: Input) {
+//    input.verify()
+//}
+```
+
+By [Mach-34](https://mach34.space)
