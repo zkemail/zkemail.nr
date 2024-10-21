@@ -1,7 +1,6 @@
 mod EmailLarge {
 
     use crate::{Sequence, KEY_LIMBS_2048, dkim::RSAPubkey};
-    use std::collections::bounded_vec::BoundedVec;
 
     // regular inputs
     global EMAIL_LARGE_MAX_HEADER_LENGTH: u32 = 512;
@@ -71,9 +70,48 @@ mod EmailLarge {
     }
 }
 
-mod FromHeaderFields {
-    global EMAIL_ONLY: [u8; 38] = comptime { "\r\nfrom:runnier.leagues.0j@icloud.com\r\n".as_bytes() };
+mod EmailAddresses {
+    
+    use crate::{Sequence, MAX_EMAIL_ADDRESS_LENGTH};
+    global ADDRESS: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> = BoundedVec::from_array("runnier.leagues.0j@icloud.com".as_bytes());
+    global ADDRESS_ONLY: [u8; 38] = comptime { "\r\nfrom:runnier.leagues.0j@icloud.com\r\n".as_bytes() };
     global NO_BRACKETS: [u8; 51] = comptime { "\r\nfrom:ZKEmail Team runnier.leagues.0j@icloud.com\r\n".as_bytes() };
     global BRACKETS: [u8; 52] = comptime { "\r\nfrom:ZKEmail Team <runnier.leagues.0j@icloud.com\r\n".as_bytes() };
     global QUOTES: [u8; 66] = comptime { "\r\nfrom:\"president@whitehouse.gov\" <runnier.leagues.0j@icloud.com\r\n".as_bytes() };
+    global ADDRESS_ONLY_FIELD_SEQUENCE = Sequence {
+        index: 2,
+        length: 34
+    };
+    global ADDRESS_ONLY_ADDRESS_SEQUENCE = Sequence {
+        index: 7,
+        length: 29
+    };
+    global NO_BRACKETS_FIELD_SEQUENCE = Sequence {
+        index: 2,
+        length: 47
+    };
+    global NO_BRACKETS_ADDRESS_SEQUENCE = Sequence {
+        index: 20,
+        length: 29
+    };
+    global BRACKETS_FIELD_SEQUENCE = Sequence {
+        index: 2,
+        length: 48
+    };
+    global BRACKETS_ADDRESS_SEQUENCE = Sequence {
+        index: 21,
+        length: 29
+    };
+    global QUOTES_FIELD_SEQUENCE = Sequence {
+        index: 2,
+        length: 62
+    };
+    global QUOTES_ADDRESS_SEQUENCE = Sequence {
+        index: 35,
+        length: 29
+    };
+    global MALICIOUS_QUOTES_ADDRESS_SEQUENCE = Sequence {
+        index: 8,
+        length: 24
+    };
 }

@@ -3,8 +3,8 @@ mod test_inputs;
 mod test_success {
 
     use crate::{
-        headers::body_hash::get_body_hash, tests::test_inputs::EmailLarge,
-        partial_hash::partial_sha256_var_end
+        headers::{email_address::get_email_address, body_hash::get_body_hash},
+        tests::test_inputs::EmailLarge, partial_hash::partial_sha256_var_end, MAX_EMAIL_ADDRESS_LENGTH
     };
     use std::hash::sha256_var;
 
@@ -48,6 +48,33 @@ mod test_success {
         assert(
             signed_body_hash == computed_body_hash, "Sha256 hash computed over body does not match DKIM-signed header"
         );
+    }
+
+    #[test]
+    fn test_address_extraction() {
+        let from = comptime {
+            "from".as_bytes()
+        };
+        let to = comptime {
+            "to".as_bytes()
+        };
+        // 16k gate cost? has to be able to be brought down
+        let from_address = get_email_address(
+            EmailLarge::HEADER,
+            EmailLarge::FROM_HEADER_SEQUENCE,
+            EmailLarge::FROM_ADDRESS_SEQUENCE,
+            from
+        );
+        let to_address = get_email_address(
+            EmailLarge::HEADER,
+            EmailLarge::TO_HEADER_SEQUENCE,
+            EmailLarge::TO_ADDRESS_SEQUENCE,
+            to
+        );
+        let expected_from_address: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> = BoundedVec::from_array("runnier.leagues.0j@icloud.com".as_bytes());
+        let expected_to_address: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> = BoundedVec::from_array("zkewtest@gmail.com".as_bytes());
+        assert_eq(expected_from_address, from_address, "From address does not match expected address");
+        assert_eq(expected_to_address, to_address, "To address does not match expected address");
     }
 }
 
@@ -208,11 +235,7 @@ mod header_field_access {
         tampered_header.storage[combined_sequence.length + 3] = "\n".as_bytes()[0];
         let tampered_body_hash_index = 93; // just manually setting this
         // attempt to get body hash
-        let _ = get_body_hash(
-            tampered_header,
-            combined_sequence,
-            tampered_body_hash_index
-        );
+        let _ = get_body_hash(tampered_header, combined_sequence, tampered_body_hash_index);
     }
 
     #[test(should_fail_with = "Header field out of bounds")]
@@ -225,6 +248,157 @@ mod header_field_access {
             shortened_header,
             EmailLarge::DKIM_HEADER_SEQUENCE,
             EmailLarge::BODY_HASH_INDEX
+        );
+    }
+}
+
+mod test_address_extraction {
+    // header field constrains are not checked here, should work same as tests in header_field_access
+    use crate::{headers::email_address::get_email_address, Sequence, tests::test_inputs::EmailAddresses};
+
+    #[test]
+    fn test_email_only() {
+        let from: [u8; 4] = comptime {
+            "from".as_bytes()
+        };
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::ADDRESS_ONLY);
+        let address = get_email_address(
+            header,
+            EmailAddresses::ADDRESS_ONLY_FIELD_SEQUENCE,
+            EmailAddresses::ADDRESS_ONLY_ADDRESS_SEQUENCE,
+            from
+        );
+        assert_eq(address, EmailAddresses::ADDRESS);
+    }
+
+    #[test]
+    fn test_no_brackets() {
+        let from: [u8; 4] = comptime {
+            "from".as_bytes()
+        };
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::NO_BRACKETS);
+        let address = get_email_address(
+            header,
+            EmailAddresses::NO_BRACKETS_FIELD_SEQUENCE,
+            EmailAddresses::NO_BRACKETS_ADDRESS_SEQUENCE,
+            from
+        );
+        assert_eq(address, EmailAddresses::ADDRESS);
+    }
+
+    #[test]
+    fn test_brackets() {
+        let from: [u8; 4] = comptime {
+            "from".as_bytes()
+        };
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::BRACKETS);
+        let address = get_email_address(
+            header,
+            EmailAddresses::BRACKETS_FIELD_SEQUENCE,
+            EmailAddresses::BRACKETS_ADDRESS_SEQUENCE,
+            from
+        );
+        assert_eq(address, EmailAddresses::ADDRESS);
+    }
+
+    #[test]
+    fn test_quotes() {
+        let from: [u8; 4] = comptime {
+            "from".as_bytes()
+        };
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        let address = get_email_address(
+            header,
+            EmailAddresses::QUOTES_FIELD_SEQUENCE,
+            EmailAddresses::QUOTES_ADDRESS_SEQUENCE,
+            from
+        );
+        assert_eq(address, EmailAddresses::ADDRESS);
+    }
+
+    #[test(should_fail_with = "Email address must start immediately after '<' if bracket is present")]
+    fn test_malicious_display_name() {
+        let from: [u8; 4] = comptime {
+            "from".as_bytes()
+        };
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        let _ = get_email_address(
+            header,
+            EmailAddresses::QUOTES_FIELD_SEQUENCE,
+            EmailAddresses::MALICIOUS_QUOTES_ADDRESS_SEQUENCE,
+            from
+        );
+    }
+
+    #[test(should_fail_with = "Email address must start immediately after '<' if bracket is present")]
+    fn test_not_full_address_bracket_start() {
+        let from: [u8; 4] = comptime {
+            "from".as_bytes()
+        };
+        // mutate index to remove "runnier." from address
+        let mut malicious_sequence = EmailAddresses::QUOTES_ADDRESS_SEQUENCE;
+        malicious_sequence.index = malicious_sequence.index + 8;
+        malicious_sequence.length = malicious_sequence.length - 8;
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        let _ = get_email_address(
+            header,
+            EmailAddresses::QUOTES_FIELD_SEQUENCE,
+            malicious_sequence,
+            from
+        );
+    }
+
+    #[test(should_fail_with = "Email address must end with an acceptable character")]
+    fn test_not_full_address_bracket_end() {
+        let from: [u8; 4] = comptime {
+            "from".as_bytes()
+        };
+        // mutate index to remove ".com" from address
+        let mut malicious_sequence = EmailAddresses::QUOTES_ADDRESS_SEQUENCE;
+        malicious_sequence.index = malicious_sequence.index;
+        malicious_sequence.length = malicious_sequence.length - 4;
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        let _ = get_email_address(
+            header,
+            EmailAddresses::QUOTES_FIELD_SEQUENCE,
+            malicious_sequence,
+            from
+        );
+    }
+
+    #[test(should_fail_with = "Email address must start with an acceptable character")]
+    fn test_not_full_address_start() {
+        let from: [u8; 4] = comptime {
+            "from".as_bytes()
+        };
+        // mutate index to remove "runnier." from address
+        let mut malicious_sequence = EmailAddresses::ADDRESS_ONLY_ADDRESS_SEQUENCE;
+        malicious_sequence.index = malicious_sequence.index + 8;
+        malicious_sequence.length = malicious_sequence.length - 8;
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::ADDRESS_ONLY);
+        let _ = get_email_address(
+            header,
+            EmailAddresses::ADDRESS_ONLY_FIELD_SEQUENCE,
+            malicious_sequence,
+            from
+        );
+    }
+
+    #[test(should_fail_with = "Email address must end with an acceptable character")]
+    fn test_not_full_address_end() {
+        let from: [u8; 4] = comptime {
+            "from".as_bytes()
+        };
+        // mutate index to remove ".com" from address
+        let mut malicious_sequence = EmailAddresses::ADDRESS_ONLY_ADDRESS_SEQUENCE;
+        malicious_sequence.index = malicious_sequence.index;
+        malicious_sequence.length = malicious_sequence.length - 4;
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::ADDRESS_ONLY);
+        let _ = get_email_address(
+            header,
+            EmailAddresses::ADDRESS_ONLY_FIELD_SEQUENCE,
+            malicious_sequence,
+            from
         );
     }
 }

@@ -14,12 +14,6 @@ const emails = {
   large: fs.readFileSync(
     path.join(__dirname, "./test-data/email-good-large.eml")
   ),
-  tamperedBody: fs.readFileSync(
-    path.join(__dirname, "./test-data/email-body-tampered.eml")
-  ),
-  tamperedHeader: fs.readFileSync(
-    path.join(__dirname, "./test-data/email-header-tampered.eml")
-  ),
 };
 
 // default header/ body lengths to use for input gen
@@ -61,10 +55,11 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
   describe("Successful Cases", () => {
     it("2048-bit DKIM", async () => {
       const inputs = await generateEmailVerifierInputs(
-        emails.large,
+        emails.small,
         inputParams
       );
       await prover2048.simulateWitness(inputs);
+      console.log(toProverToml(inputs));
     });
     it("Partial Hash", async () => {
       const inputs = await generateEmailVerifierInputs(emails.large, {
@@ -108,7 +103,7 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       expect(expectedMaskedBody).toEqual(acutalMaskedBody);
     });
     it("Extract Sender/ Recipient", async () => {
-      const inputs = await generateEmailVerifierInputs(emails.large, {
+      const inputs = await generateEmailVerifierInputs(emails.small, {
         extractFrom: true,
         extractTo: true,
         ...inputParams,
@@ -143,9 +138,6 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       );
       expect(expectedFrom).toEqual(actualFrom);
       expect(expectedTo).toEqual(actualTo);
-
-      console.log(toProverToml(inputs))
     });
   });
-
 });
