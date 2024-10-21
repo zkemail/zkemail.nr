@@ -1,6 +1,6 @@
 {
-  "name": "@mach-34/zkemail-nr",
-  "version": "1.2.0",
+  "name": "@zk-email/zkemail-nr",
+  "version": "1.2.1",
   "main": "dist",
   "types": "dist",
   "license": "MIT",
