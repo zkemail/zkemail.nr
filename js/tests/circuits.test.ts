@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { ZKEmailProver } from "../src/prover";
 import { generateEmailVerifierInputs } from "../src/index";
-import { makeEmailAddressCharTable } from "../src/utils";
+import { makeEmailAddressCharTable, toProverToml } from "../src/utils";
 // import circuit1024 from "../../examples/verify_email_1024_bit_dkim/target/verify_email_1024_bit_dkim.json";
 import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify_email_2048_bit_dkim.json";
 import circuitPartialHash from "../../examples/partial_hash/target/partial_hash.json";
@@ -59,6 +59,7 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
         inputParams
       );
       await prover2048.simulateWitness(inputs);
+      console.log(toProverToml(inputs));
     });
     it("Partial Hash", async () => {
       const inputs = await generateEmailVerifierInputs(emails.large, {

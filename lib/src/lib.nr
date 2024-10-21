@@ -1,11 +1,12 @@
 use dep::std::{hash::pedersen_hash, collections::bounded_vec::BoundedVec};
 use crate::dkim::RSAPubkey;
 
-mod dkim;
-mod headers;
-mod partial_hash;
-mod masking;
+pub mod dkim;
+pub mod headers;
+pub mod partial_hash;
+pub mod masking;
 // mod macro;
+mod tests;
 
 global RSA_EXPONENT: u32 = 65537;
 global KEY_BYTES_1024: u32 = 128;
