@@ -46,7 +46,11 @@ export function toProverToml(inputs: any): string {
     } else {
       let values = "";
       for (const [k, v] of Object.entries(value!)) {
-        values = values.concat(`${k} = '${v}'\n`);
+        if (Array.isArray(v)) {
+          values = values.concat(`${k} = [${v.map((val) => `'${val}'`).join(", ")}]\n`);
+        } else {
+          values = values.concat(`${k} = '${v}'\n`);
+        }
       }
       structs.push(`[${key}]\n${values}`);
     }

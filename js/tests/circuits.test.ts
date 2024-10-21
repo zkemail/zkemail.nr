@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { ZKEmailProver } from "../src/prover";
 import { generateEmailVerifierInputs } from "../src/index";
-import { makeEmailAddressCharTable } from "../src/utils";
+import { makeEmailAddressCharTable, toProverToml } from "../src/utils";
 // import circuit1024 from "../../examples/verify_email_1024_bit_dkim/target/verify_email_1024_bit_dkim.json";
 import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify_email_2048_bit_dkim.json";
 import circuitPartialHash from "../../examples/partial_hash/target/partial_hash.json";
@@ -13,6 +13,12 @@ const emails = {
   small: fs.readFileSync(path.join(__dirname, "./test-data/email-good.eml")),
   large: fs.readFileSync(
     path.join(__dirname, "./test-data/email-good-large.eml")
+  ),
+  tamperedBody: fs.readFileSync(
+    path.join(__dirname, "./test-data/email-body-tampered.eml")
+  ),
+  tamperedHeader: fs.readFileSync(
+    path.join(__dirname, "./test-data/email-header-tampered.eml")
   ),
 };
 
@@ -55,7 +61,7 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
   describe("Successful Cases", () => {
     it("2048-bit DKIM", async () => {
       const inputs = await generateEmailVerifierInputs(
-        emails.small,
+        emails.large,
         inputParams
       );
       await prover2048.simulateWitness(inputs);
@@ -102,7 +108,7 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       expect(expectedMaskedBody).toEqual(acutalMaskedBody);
     });
     it("Extract Sender/ Recipient", async () => {
-      const inputs = await generateEmailVerifierInputs(emails.small, {
+      const inputs = await generateEmailVerifierInputs(emails.large, {
         extractFrom: true,
         extractTo: true,
         ...inputParams,
@@ -137,6 +143,9 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       );
       expect(expectedFrom).toEqual(actualFrom);
       expect(expectedTo).toEqual(actualTo);
+
+      console.log(toProverToml(inputs))
     });
   });
+
 });
