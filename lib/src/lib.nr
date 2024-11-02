@@ -3,8 +3,9 @@ use crate::dkim::RSAPubkey;
 
 pub mod dkim;
 pub mod headers;
-pub mod partial_hash;
 pub mod masking;
+pub mod partial_hash;
+pub mod remove_soft_line_breaks;
 // mod macro;
 mod tests;
 

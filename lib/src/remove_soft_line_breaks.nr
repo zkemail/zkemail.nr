@@ -1,4 +1,4 @@
-use std::hash::poseidon2;
+use std::hash::poseidon2::Poseidon2;
 
 /**
  * Remove soft line breaks from the given text
@@ -6,16 +6,16 @@ use std::hash::poseidon2;
  * @param text The text to remove soft line breaks from
  */
 pub fn remove_soft_line_breaks<let N: u32>(
-    encoded: BoundedVec<u8, N>,
-    decoded: BoundedVec<u8, N>
+    encoded: [u8; N],
+    decoded: [u8; N]
 ) -> bool {
     // derive r from poseidon hash
-    let mut r_input: [u8; 2*N] = [0; 2*N];
+    let mut r_input: [Field; 2*N] = [0; 2*N];
     for i in 0..encoded.len() {
-        r_input[i] = encoded[i];
-        r_input[i + N] = encoded[i];
+        r_input[i] = encoded[i] as Field;
+        r_input[i + N] = encoded[i] as Field;
     }
-    let r = poseidon2(r_input, 2*N);
+    let r = Poseidon2::hash(r_input, 2*N);
 
     // check for "=" (0x3D), "\r" (0x0D), and "\n" (0x0A)
     let mut is_equals: [bool; N] = [false; N];
@@ -23,8 +23,8 @@ pub fn remove_soft_line_breaks<let N: u32>(
     let mut is_lf: [bool; N] = [false; N];
     for i in 0..N - 2 {
         is_equals[i] = encoded[i] == 0x3D;
-        is_cr[i] = encoded[i] == 0x0D;
-        is_lf[i] = encoded[i] == 0x0A;
+        is_cr[i] = encoded[i + 1] == 0x0D;
+        is_lf[i] = encoded[i + 2] == 0x0A;
     }
     is_equals[N - 2] = encoded[N - 2] == 0x3D;
     is_equals[N - 1] = encoded[N - 1] == 0x3D;
@@ -41,14 +41,14 @@ pub fn remove_soft_line_breaks<let N: u32>(
     should_zero[0] = is_soft_break[0];
     should_zero[1] = is_soft_break[1] + is_soft_break[0];
     should_zero[N - 1] = is_soft_break[N - 2] + is_soft_break[N - 3];
-    for i in 2..N=1 {
+    for i in 2..N - 1 {
         should_zero[i] = is_soft_break[i] + is_soft_break[i - 1] + is_soft_break[i - 2];
     }
 
     // process encoded input
-    let mut processed: [bool; N] = [false; N];
+    let mut processed: [u8; N] = [0; N];
     for i in 0..N {
-        processed[i] = should_zero[i] & encoded[i];
+        processed[i] = (1 - should_zero[i] as u8) * encoded[i];
     }
 
     // calculate powers of r for encoded
@@ -77,16 +77,18 @@ pub fn remove_soft_line_breaks<let N: u32>(
     // calculate rlc for processed
     let mut sum_enc: [Field; N] = [0; N];
     let mut sum_dec: [Field; N] = [0; N];
-    sum_enc[0] = r_encoded[0] * processed[0];
-    sum_dec[0] = r_decoded[0] * decoded[0];
+    sum_enc[0] = r_encoded[0] * processed[0] as Field;
+    sum_dec[0] = r_decoded[0] * decoded[0] as Field;
     for i in 1..N {
-        sum_enc[i] = sum_enc[i - 1] + r_encoded[i] * processed[i];
-        sum_dec[i] = sum_dec[i - 1] + r_decoded[i] * decoded[i];
+        sum_enc[i] = sum_enc[i - 1] + r_encoded[i] * processed[i] as Field;
+        sum_dec[i] = sum_dec[i - 1] + r_decoded[i] * decoded[i] as Field;
     }
 
     // determine if rlc for decoded and encoded match
     sum_enc[N - 1] == sum_dec[N - 1]
 }
+
+// test vectors copied from https://github.com/zkemail/zk-email-verify/blob/main/packages/circuits/tests/remove-soft-line-breaks.test.ts
 
 #[test]
 pub fn test_remove_soft_line_breaks() {
@@ -102,6 +104,8 @@ pub fn test_remove_soft_line_breaks() {
         0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0
     ];
+    let res = remove_soft_line_breaks(encoded, decoded);
+    assert(res, "Expected to remove soft line breaks");
 }
 
 #[test]
@@ -117,7 +121,9 @@ pub fn test_return_false_incorrect_decoded_input() {
         97, 108, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0
-    ]
+    ];
+    let res = remove_soft_line_breaks(encoded, decoded);
+    assert(!res, "Expected to return false for incorrect decoded input");
 }
 
 #[test]
@@ -134,6 +140,8 @@ pub fn test_handle_no_soft_line_breaks() {
         0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0
     ];
+    let res = remove_soft_line_breaks(encoded, decoded);
+    assert(res, "Expected to handle no soft line breaks");
 }
 
 #[test]
@@ -150,6 +158,8 @@ pub fn test_handle_consecutive_soft_line_breaks() {
         0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0
     ];
+    let res = remove_soft_line_breaks(encoded, decoded);
+    assert(res, "Expected to handle consecutive soft line breaks");
 }
 
 #[test]
@@ -166,6 +176,8 @@ pub fn test_handle_soft_line_break_beginning() {
         0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0
     ];
+    let res = remove_soft_line_breaks(encoded, decoded);
+    assert(res, "Expected to handle soft line break at beginning");
 }
 
 #[test]
@@ -182,6 +194,8 @@ pub fn test_handle_soft_line_break_end() {
         0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0
     ];
+    let res = remove_soft_line_breaks(encoded, decoded);
+    assert(res, "Expected to handle soft line break at end");
 }
 
 #[test]
@@ -198,4 +212,6 @@ pub fn test_handle_incomplete_line_break() {
         0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0
     ];
+    let res = remove_soft_line_breaks(encoded, decoded);
+    assert(res, "Expected to handle incomplete line break");
 }
