@@ -1,11 +1,9 @@
-use dep::std::{collections::bounded_vec::BoundedVec, hash::{sha256_var, pedersen_hash}, panic::panic};
-use dep::rsa::{bignum::{fields::{Params1024, Params2048}, runtime_bignum::BigNumInstance, BigNum}, types::RSA};
-use crate::{KEY_LIMBS_1024, KEY_BYTES_1024, KEY_LIMBS_2048, KEY_BYTES_2048, RSA_EXPONENT};
-
-type BN1024 = BigNum<KEY_LIMBS_1024, Params1024>;
-type RSA1024 = RSA<BN1024, BigNumInstance<KEY_LIMBS_1024, Params1024>, KEY_BYTES_1024>;
-type BN2048 = BigNum<KEY_LIMBS_2048, Params2048>;
-type RSA2048 = RSA<BN2048, BigNumInstance<KEY_LIMBS_2048, Params2048>, KEY_BYTES_2048>;
+use crate::{KEY_LIMBS_1024, KEY_LIMBS_2048, RSA_EXPONENT};
+use rsa::{
+    bignum::{params::BigNumParams, runtime_bignum::RuntimeBigNum},
+    types::{BN1024, BN2048, RSA, RSA1024, RSA2048},
+};
+use std::hash::{pedersen_hash, sha256_var};
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
     modulus: [Field; KEY_LIMBS],
@@ -22,20 +20,21 @@ impl RSAPubkey<KEY_LIMBS_1024> {
     fn verify_dkim_signature<let MAX_HEADER_LENGTH: u32>(
         self,
         header: BoundedVec<u8, MAX_HEADER_LENGTH>,
-        signature: [Field; KEY_LIMBS_1024]
+        signature: [Field; KEY_LIMBS_1024],
     ) {
         // hash the header
         let header_hash = sha256_var(header.storage, header.len() as u64);
-        // instantiate the BNInstance for the pubkey
-        // todo: make as BigNumInstance from the outset to reduce some work
-        let pubkey: BigNumInstance<KEY_LIMBS_1024, Params1024> = BigNumInstance::new(self.modulus, self.redc);
+
+        // instantiate the pubkey as bn params
+        // todo: instantiate outside of circuit
+        let pubkey_params = BigNumParams::new(false, self.modulus, self.redc);
 
         // instantiate BN for the signature
-        let signature: BN1024 = BigNum::from_array(signature);
+        let signature_bn: BN1024 = RuntimeBigNum::from_array(pubkey_params, signature);
 
         // verify the DKIM signature over the header
         let rsa: RSA1024 = RSA {};
-        assert(rsa.verify_sha256_pkcs1v15(pubkey, header_hash, signature, RSA_EXPONENT));
+        assert(rsa.verify_sha256_pkcs1v15(header_hash, signature_bn, RSA_EXPONENT));
     }
 }
 
@@ -43,19 +42,19 @@ impl RSAPubkey<KEY_LIMBS_2048> {
     fn verify_dkim_signature<let MAX_HEADER_LENGTH: u32>(
         self,
         header: BoundedVec<u8, MAX_HEADER_LENGTH>,
-        signature: [Field; KEY_LIMBS_2048]
+        signature: [Field; KEY_LIMBS_2048],
     ) {
         // hash the header
         let header_hash = sha256_var(header.storage, header.len() as u64);
         // instantiate the BNInstance for the pubkey
         // todo: make as BigNumInstance from the outset to reduce some work
-        let pubkey: BigNumInstance<KEY_LIMBS_2048, Params2048> = BigNumInstance::new(self.modulus, self.redc);
+        let pubkey_params = BigNumParams::new(false, self.modulus, self.redc);
 
         // instantiate BN for the signature
-        let signature: BN2048 = BigNum::from_array(signature);
+        let signature_bn: BN2048 = RuntimeBigNum::from_array(pubkey_params, signature);
 
         // verify the DKIM signature over the header
         let rsa: RSA2048 = RSA {};
-        assert(rsa.verify_sha256_pkcs1v15(pubkey, header_hash, signature, RSA_EXPONENT));
+        assert(rsa.verify_sha256_pkcs1v15(header_hash, signature_bn, RSA_EXPONENT));
     }
 }
