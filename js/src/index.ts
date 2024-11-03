@@ -42,6 +42,8 @@ export type CircuitInput = {
   // inputs used for only masking
   header_mask?: string[];
   body_mask?: string[];
+  // input for decoded body
+  decoded_body?: BoundedVec;
   // inputs used for address extraction
   from_header_sequence?: Sequence;
   from_address_sequence?: Sequence;
@@ -62,33 +64,37 @@ export type InputGenerationArgs = {
   extractTo?: boolean;
 };
 
-// copied without modification, but not publicly exported in original
-// function removeSoftLineBreaks(body: string[]): string[] {
-//   const result = [];
-//   let i = 0;
-//   while (i < body.length) {
-//     if (
-//       i + 2 < body.length &&
-//       body[i] === "61" && // '=' character
-//       body[i + 1] === "13" && // '\r' character
-//       body[i + 2] === "10"
-//     ) {
-//       // '\n' character
-//       // Skip the soft line break sequence
-//       i += 3; // Move past the soft line break
-//     } else {
-//       result.push(body[i]);
-//       i++;
-//     }
-//   }
-//   // Pad the result with zeros to make it the same length as the body
-//   while (result.length < body.length) {
-//     result.push("0");
-//   }
-//   return result;
-// }
+/** Formatted for BoundedVec in case used in other places */
+function removeSoftLineBreaks(body: BoundedVec): BoundedVec {
+  const result = [];
+  let i = 0;
+  let count = 0;
+  while (i < body.storage.length) {
+    if (
+      i + 2 < body.storage.length &&
+      body.storage[i] === "61" && // '=' character
+      body.storage[i + 1] === "13" && // '\r' character
+      body.storage[i + 2] === "10"
+    ) {
+      // '\n' character
+      // Skip the soft line break sequence
+      i += 3; // Move past the soft line break
+    } else {
+      result.push(body.storage[i]);
+      i++;
+      count++;
+    }
+  }
+  // Pad the result with zeros to make it the same length as the body
+  while (result.length < body.storage.length) {
+    result.push("0");
+  }
+  return {
+    storage: result,
+    len: count.toString()
+  };
+}
 
-// copied without modification, needed for different generateEmailVerifierInnputsFromDKIMResult
 /**
  * @description Generate circuit inputs for the EmailVerifier circuit from raw email content
  * @param rawEmail Full email content as a buffer or string
@@ -200,6 +206,11 @@ export function generateEmailVerifierInputsFromDKIMResult(
     // masking
     if (params.headerMask) circuitInputs.header_mask = params.headerMask.map((x) => x.toString());
     if (params.bodyMask) circuitInputs.body_mask = params.bodyMask.map((x) => x.toString());
+
+    // remove soft line breaks
+    if (params.removeSoftLineBreaks) {
+      circuitInputs.decoded_body = removeSoftLineBreaks(circuitInputs.body);
+    }
 
     // address extraction
     if (params.extractFrom) {

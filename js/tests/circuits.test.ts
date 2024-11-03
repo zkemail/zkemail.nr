@@ -1,13 +1,15 @@
 import fs from "fs";
 import path from "path";
+import { describe, beforeAll, } from "jest";
 import { ZKEmailProver } from "../src/prover";
-import { generateEmailVerifierInputs } from "../src/index";
-import { makeEmailAddressCharTable, toProverToml } from "../src/utils";
+import { generateEmailVerifierInputs }  from "../src/index";
+import { toProverToml } from "../src/utils";
 // import circuit1024 from "../../examples/verify_email_1024_bit_dkim/target/verify_email_1024_bit_dkim.json";
 import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify_email_2048_bit_dkim.json";
 import circuitPartialHash from "../../examples/partial_hash/target/partial_hash.json";
 import circuitEmailMask from "../../examples/email_mask/target/email_mask.json";
 import circuitExtractAddresses from "../../examples/extract_addresses/target/extract_addresses.json";
+import circuitRemoveSoftLineBreak from "../examples/remove_soft_line_breaks/target/remove_soft_line_breaks.json";
 
 const emails = {
   small: fs.readFileSync(path.join(__dirname, "./test-data/email-good.eml")),

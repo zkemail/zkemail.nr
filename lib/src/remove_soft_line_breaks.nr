@@ -1,4 +1,26 @@
 use std::hash::poseidon2::Poseidon2;
+use nodash::array::pack_bytes;
+
+/**
+ * Computes R by packing bytes into fields before hashing to reduce the work
+ *
+ * @param encoded The encoded input array
+ * @param decoded The decoded input array
+ * @returns the poseidon hash of the bytes packed into field elements
+ */ 
+fn compressed_r<let N: u32>(
+    encoded: [u8; N],
+    decoded: [u8; N]
+) -> Field {
+    let encoded_packed = pack_bytes(encoded);
+    let decoded_packed = pack_bytes(decoded);
+    let mut input: [Field; 2 * (N / 31 + 1)] = [0; 2 * (N / 31 + 1)];
+    for i in 0..encoded_packed.len() {
+        input[i] = encoded_packed[i];
+        input[i + N / 31 + 1] = decoded_packed[i];
+    }
+    Poseidon2::hash(input, input.len())
+}
 
 /**
  * Remove soft line breaks from the given text
@@ -10,12 +32,13 @@ pub fn remove_soft_line_breaks<let N: u32>(
     decoded: [u8; N]
 ) -> bool {
     // derive r from poseidon hash
-    let mut r_input: [Field; 2*N] = [0; 2*N];
-    for i in 0..encoded.len() {
-        r_input[i] = encoded[i] as Field;
-        r_input[i + N] = encoded[i] as Field;
-    }
-    let r = Poseidon2::hash(r_input, 2*N);
+    // let mut r_input: [Field; 2*N] = [0; 2*N];
+    // for i in 0..encoded.len() {
+    //     r_input[i] = encoded[i] as Field;
+    //     r_input[i + N] = encoded[i] as Field;
+    // }
+    // let r = Poseidon2::hash(r_input, 2*N);
+    let r = compressed_r(encoded, decoded);
 
     // check for "=" (0x3D), "\r" (0x0D), and "\n" (0x0A)
     let mut is_equals: [bool; N] = [false; N];
