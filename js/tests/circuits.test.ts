@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from "path";
-import { describe, beforeAll, } from "jest";
 import { ZKEmailProver } from "../src/prover";
 import { generateEmailVerifierInputs }  from "../src/index";
 import { toProverToml } from "../src/utils";
@@ -9,7 +8,7 @@ import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify
 import circuitPartialHash from "../../examples/partial_hash/target/partial_hash.json";
 import circuitEmailMask from "../../examples/email_mask/target/email_mask.json";
 import circuitExtractAddresses from "../../examples/extract_addresses/target/extract_addresses.json";
-import circuitRemoveSoftLineBreak from "../examples/remove_soft_line_breaks/target/remove_soft_line_breaks.json";
+import circuitRemoveSoftLineBreak from "../../examples/remove_soft_line_breaks/target/remove_soft_line_breaks.json";
 
 const emails = {
   small: fs.readFileSync(path.join(__dirname, "./test-data/email-good.eml")),
@@ -25,25 +24,25 @@ const inputParams = {
 };
 
 describe("ZKEmail.nr Circuit Unit Tests", () => {
-  // todo: get a github email from a throwaway account to verify
-  // let prover1024: ZKEmailProver;
-  const selectorText = "All nodes in the Bitcoin network can consult it";
   let prover2048: ZKEmailProver;
   let proverPartialHash: ZKEmailProver;
   let proverMasked: ZKEmailProver;
   let proverExtractAddresses: ZKEmailProver;
+  let proverRemoveSoftLineBreak: ZKEmailProver;
 
   beforeAll(() => {
     //@ts-ignore
     // prover1024 = new ZKEmailProver(circuit1024, "all");
     //@ts-ignore
-    prover2048 = new ZKEmailProver(circuit2048, "all");
+    prover2048 = new ZKEmailProver(circuit2048);
     //@ts-ignore
-    proverPartialHash = new ZKEmailProver(circuitPartialHash, "all");
+    proverPartialHash = new ZKEmailProver(circuitPartialHash);
     //@ts-ignore
-    proverMasked = new ZKEmailProver(circuitEmailMask, "all");
+    proverMasked = new ZKEmailProver(circuitEmailMask);
     //@ts-ignore
-    proverExtractAddresses = new ZKEmailProver(circuitExtractAddresses, "all");
+    proverExtractAddresses = new ZKEmailProver(circuitExtractAddresses);
+    //@ts-ignore
+    proverRemoveSoftLineBreak = new ZKEmailProver(circuitRemoveSoftLineBreak);
   });
 
   afterAll(async () => {
@@ -52,20 +51,21 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
     await proverPartialHash.destroy();
     await proverMasked.destroy();
     await proverExtractAddresses.destroy();
+    await proverRemoveSoftLineBreak.destroy();
   });
 
-  describe("Successful Cases", () => {
+  describe("Simulate Witnesses", () => {
     it("2048-bit DKIM", async () => {
       const inputs = await generateEmailVerifierInputs(
         emails.small,
         inputParams
       );
       await prover2048.simulateWitness(inputs);
-      console.log(toProverToml(inputs));
+      // console.log(toProverToml(inputs));
     });
     it("Partial Hash", async () => {
       const inputs = await generateEmailVerifierInputs(emails.large, {
-        shaPrecomputeSelector: selectorText,
+        shaPrecomputeSelector: "All nodes in the Bitcoin network can consult it",
         maxHeadersLength: 512,
         maxBodyLength: 192,
       });
@@ -141,5 +141,12 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       expect(expectedFrom).toEqual(actualFrom);
       expect(expectedTo).toEqual(actualTo);
     });
+    it("Remove Soft Line Breaks", async () => {
+      const inputs = await generateEmailVerifierInputs(emails.large, {
+        removeSoftLineBreaks: true,
+        ...inputParams,
+      });
+      await proverRemoveSoftLineBreak.simulateWitness(inputs);
+    })
   });
 });

@@ -34,31 +34,31 @@ fn main(
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
     assert(body.len() <= MAX_EMAIL_BODY_LENGTH);
 
-    // // ~ 86,553 constraints
-    // // verify the dkim signature over the header
-    // pubkey.verify_dkim_signature(header, signature);
+    // ~ 86,553 constraints
+    // verify the dkim signature over the header
+    pubkey.verify_dkim_signature(header, signature);
 
-    // // ~ 6,289 constraints
-    // // extract the body hash from the header
-    // let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
+    // ~ 6,289 constraints
+    // extract the body hash from the header
+    let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
 
-    // // ~ 113,962 constraints
-    // // hash the asserted body
-    // let computed_body_hash: [u8; 32] = sha256_var(body.storage(), body.len() as u64);
+    // ~ 113,962 constraints
+    // hash the asserted body
+    let computed_body_hash: [u8; 32] = sha256_var(body.storage(), body.len() as u64);
 
-    // // compare the body hashes
-    // assert(
-    //     signed_body_hash == computed_body_hash, "SHA256 hash computed over body does not match body hash found in DKIM-signed header"
-    // );
+    // compare the body hashes
+    assert(
+        signed_body_hash == computed_body_hash, "SHA256 hash computed over body does not match body hash found in DKIM-signed header"
+    );
 
+    // ~ 37,982 constraints
     // ensure the decoded body is the same as the original body
     assert(
         remove_soft_line_breaks(body.storage(), decoded_body.storage()),
         "Decoded body does not properly remove soft line breaks"
     );
 
-    // // ~ 10,255 constraints
-    // // hash the pubkey and signature for the standard outputs
-    // standard_outputs(pubkey.modulus, signature)
-    [0, 0]
+    // ~ 10,255 constraints
+    // hash the pubkey and signature for the standard outputs
+    standard_outputs(pubkey.modulus, signature)
 }
