@@ -7,6 +7,7 @@ import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify
 import circuitPartialHash from "../../examples/partial_hash/target/partial_hash.json";
 import circuitEmailMask from "../../examples/email_mask/target/email_mask.json";
 import circuitExtractAddresses from "../../examples/extract_addresses/target/extract_addresses.json";
+import circuitRemoveSoftLineBreak from "../../examples/remove_soft_line_breaks/target/remove_soft_line_breaks.json";
 
 const emails = {
   small: fs.readFileSync(path.join(__dirname, "./test-data/email-good.eml")),
@@ -22,10 +23,6 @@ const inputParams = {
 };
 
 describe("ZKEmail.nr E2E Tests", () => {
-  // todo: get a github email from a throwaway account to verify
-  // let prover1024: ZKEmailProver;
-  const selectorText = "All nodes in the Bitcoin network can consult it";
-
   describe("2048-bit circuit", () => {
     let prover: ZKEmailProver;
     describe("UltraPlonk", () => {
@@ -95,7 +92,7 @@ describe("ZKEmail.nr E2E Tests", () => {
       });
       it("Partial Hash", async () => {
         const inputs = await generateEmailVerifierInputs(emails.large, {
-          shaPrecomputeSelector: selectorText,
+          shaPrecomputeSelector: "All nodes in the Bitcoin network can consult it",
           maxHeadersLength: 512,
           maxBodyLength: 192,
         });
@@ -114,7 +111,7 @@ describe("ZKEmail.nr E2E Tests", () => {
       });
       it("Partial Hash", async () => {
         const inputs = await generateEmailVerifierInputs(emails.large, {
-          shaPrecomputeSelector: selectorText,
+          shaPrecomputeSelector: "All nodes in the Bitcoin network can consult it",
           maxHeadersLength: 512,
           maxBodyLength: 192,
         });
@@ -214,6 +211,45 @@ describe("ZKEmail.nr E2E Tests", () => {
         const inputs = await generateEmailVerifierInputs(emails.small, {
           extractFrom: true,
           extractTo: true,
+          ...inputParams,
+        });
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
+    });
+  });
+  describe("Soft Line Break Removal Circuit", () => {
+    let prover: ZKEmailProver;
+    describe("UltraPlonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuitRemoveSoftLineBreak, "plonk");
+      });
+      afterAll(async () => {
+        prover.destroy();
+      });
+      it("Remmove Soft Line Break", async () => {
+        const inputs = await generateEmailVerifierInputs(emails.large, {
+          removeSoftLineBreaks: true,
+          ...inputParams,
+        });
+        const proof = await prover.fullProve(inputs);
+        const result = await prover.verify(proof);
+        expect(result).toBeTruthy();
+      });
+    });
+    describe("UltraHonk", () => {
+      beforeAll(async () => {
+        //@ts-ignore
+        prover = new ZKEmailProver(circuitRemoveSoftLineBreak, "honk");
+      });
+      afterAll(async () => {
+        prover.destroy();
+      });
+      it("Remove Soft Line Break", async () => {
+        const inputs = await generateEmailVerifierInputs(emails.large, {
+          removeSoftLineBreaks: true,
           ...inputParams,
         });
         const proof = await prover.fullProve(inputs);
