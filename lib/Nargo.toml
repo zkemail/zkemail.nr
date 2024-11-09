@@ -5,7 +5,8 @@ authors = ["Mach 34"]
 compiler_version = ">=0.35.0"
 
 [dependencies]
-rsa = { tag = "v0.3.1", git = "https://github.com/noir-lang/noir_rsa", directory = "lib" }
-base64 = { tag = "v0.2.2", git = "https://github.com/noir-lang/noir_base64" }
+bignum = { tag = "v0.4.1", git = "https://github.com/noir-lang/noir-bignum" }
+rsa = { tag = "v0.4.0", git = "https://github.com/noir-lang/noir_rsa", directory = "lib" }
+base64 = { tag = "v0.3.0", git = "https://github.com/noir-lang/noir_base64" }
 nodash = { tag = "v0.36.0", git = "https://github.com/olehmisar/nodash" }
 # string_search = { tag = "v0.1", git = "https://github.com/noir-lang/noir_string_search"  }

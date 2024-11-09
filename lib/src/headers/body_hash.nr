@@ -1,4 +1,4 @@
-use dep::base64::base64_encode;
+use dep::base64::{BASE64_DECODER};
 use dep::std::collections::bounded_vec::BoundedVec;
 use crate::{Sequence, BODY_HASH_BASE64_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH, headers::constrain_header_field};
 
@@ -55,5 +55,5 @@ pub fn get_body_hash_unsafe<let MAX_HEADER_LENGTH: u32>(
     }
     // return the decoded body hash
     // idk why encode vs decode...
-    base64_encode::<BODY_HASH_BASE64_LENGTH, 32>(body_hash_encoded)
+    BASE64_DECODER.decode(body_hash_encoded)
 }
