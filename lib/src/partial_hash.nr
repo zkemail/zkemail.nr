@@ -147,7 +147,7 @@ pub fn partial_sha256_var_interstitial<let N: u32>(mut h: [u32; 8], msg: [u8; N]
 
         // If the block is filled, compress it.
         // An un-filled block is handled after this loop.
-        if (msg_start < N) & (msg_byte_ptr == BLOCK_SIZE) & (msg_start < message_size){
+        if (msg_start < N) & (msg_byte_ptr == BLOCK_SIZE) & (msg_start < message_size) {
             h = sha256_compression(msg_u8_to_u32(msg_block), h);
         }
     }

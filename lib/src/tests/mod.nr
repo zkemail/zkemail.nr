@@ -3,8 +3,8 @@ mod test_inputs;
 mod test_success {
 
     use crate::{
-        headers::{email_address::get_email_address, body_hash::get_body_hash},
-        tests::test_inputs::EmailLarge, partial_hash::partial_sha256_var_end, MAX_EMAIL_ADDRESS_LENGTH
+        headers::{body_hash::get_body_hash, email_address::get_email_address}, MAX_EMAIL_ADDRESS_LENGTH,
+        partial_hash::partial_sha256_var_end, tests::test_inputs::EmailLarge
     };
     use std::hash::sha256_var;
 
@@ -150,7 +150,7 @@ mod header_field_access {
             dkim_field.storage[index] = malicious_to[i];
         }
         let malicious_body_hash_index = 15;
-        // copy the body hash to the beginning of the 
+        // copy the body hash to the beginning of the
         // attempt to get body hash
         let _ = get_body_hash(dkim_field, malicious_sequence, malicious_body_hash_index);
     }
@@ -221,14 +221,16 @@ mod header_field_access {
         tampered_header.len = combined_sequence.length + 4;
         // copy dkim-signature field
         for i in 0..EmailLarge::DKIM_HEADER_SEQUENCE.length + 2 {
-            tampered_header.storage[i] = EmailLarge::HEADER.storage[EmailLarge::DKIM_HEADER_SEQUENCE.index + i - 2];
+            tampered_header.storage[i] =
+                EmailLarge::HEADER.storage[EmailLarge::DKIM_HEADER_SEQUENCE.index + i - 2];
         }
         tampered_header.storage[EmailLarge::DKIM_HEADER_SEQUENCE.length + 2] = "\r".as_bytes()[0];
         tampered_header.storage[EmailLarge::DKIM_HEADER_SEQUENCE.length + 3] = "\n".as_bytes()[0];
         // copy to field
         for i in 0..EmailLarge::TO_HEADER_SEQUENCE.length + 2 {
             let index = EmailLarge::DKIM_HEADER_SEQUENCE.length + 4;
-            tampered_header.storage[index + i] = EmailLarge::HEADER.storage[EmailLarge::TO_HEADER_SEQUENCE.index + i];
+            tampered_header.storage[index + i] =
+                EmailLarge::HEADER.storage[EmailLarge::TO_HEADER_SEQUENCE.index + i];
         }
         // set crlf at end
         tampered_header.storage[combined_sequence.length + 2] = "\r".as_bytes()[0];
@@ -242,7 +244,8 @@ mod header_field_access {
     fn test_header_field_outside_header() {
         let mut shortened_header = EmailLarge::HEADER;
         // shorten header to be just under the end of the dkim field
-        shortened_header.len = EmailLarge::DKIM_HEADER_SEQUENCE.index + EmailLarge::DKIM_HEADER_SEQUENCE.length - 1;
+        shortened_header.len =
+            EmailLarge::DKIM_HEADER_SEQUENCE.index + EmailLarge::DKIM_HEADER_SEQUENCE.length - 1;
         // attempt to get body hash
         let _ = get_body_hash(
             shortened_header,
@@ -254,7 +257,7 @@ mod header_field_access {
 
 mod test_address_extraction {
     // header field constrains are not checked here, should work same as tests in header_field_access
-    use crate::{headers::email_address::get_email_address, Sequence, tests::test_inputs::EmailAddresses};
+    use crate::{headers::email_address::get_email_address, tests::test_inputs::EmailAddresses};
 
     #[test]
     fn test_email_only() {

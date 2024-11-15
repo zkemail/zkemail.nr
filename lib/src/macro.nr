@@ -1,7 +1,5 @@
 use dep::std::{
-    meta::unquote,
-    collections::umap::UHashMap,
-    hash::{BuildHasherDefault, poseidon2::Poseidon2Hasher},
+    meta::unquote, collections::umap::UHashMap, hash::{BuildHasherDefault, poseidon2::Poseidon2Hasher},
     option::Option
 };
 
@@ -26,8 +24,6 @@ comptime mut global USED: UHashMap<Field, bool, BuildHasherDefault<Poseidon2Hash
 comptime fn zkemail(s: StructDefinition) -> Quoted {
     // setup the dkim check
     derive_dkim_check(s)
-
-
     // // check the 
     // let should_check_body = s.has_named_attribute("check_body");
     // let should_partial_hash = s.has_named_attribute("partial_hash");
@@ -39,11 +35,10 @@ comptime fn zkemail(s: StructDefinition) -> Quoted {
     //     // check it does not also have the check_body attribute
     //     let _ = s.add_generic("let MAX_EMAIL_BODY_LENGTH: u32");
     // }
-
     // no matter what, add verify signature
     // derive_dkim_check(s)
     // quote {}
-}   
+}
 
 comptime fn derive_dkim_check(s: StructDefinition) -> Quoted {
     // figure out key byte length
@@ -132,7 +127,7 @@ pub fn test_fn() {
     let header: BoundedVec<u8, HEADER_LEN> = BoundedVec::new();
     let signature: [Field; KEY_LIMBS_2048] = [0; KEY_LIMBS_2048];
     let pubkey = RSAPubkey::<KEY_LIMBS_2048> { modulus: [0; KEY_LIMBS_2048], redc: [0; KEY_LIMBS_2048] };
-    let i: input<HEADER_LEN, KEY_LIMBS_2048> = input{ header, pubkey, signature };
+    let i: input<HEADER_LEN, KEY_LIMBS_2048> = input { header, pubkey, signature };
     i.verify_dkim_signature();
     // i.do_nothing();
 }
@@ -154,7 +149,6 @@ pub fn test_fn() {
 //         // }
 //         quote {}
 //     }
-
 
 // impl<MAX_EMAIL_HEADER_LENGTH, KEY_LIMBS> for input where MAX_EMAIL_HEADER_LENGTH: u32, KEY_LIMBS: u32 {
 //     fn check_body(self) {

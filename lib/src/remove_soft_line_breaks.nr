@@ -113,11 +113,11 @@ pub fn remove_soft_line_breaks<let N: u32>(encoded: [u8; N], decoded: [u8; N]) -
 pub fn test_remove_soft_line_breaks() {
     let encoded = [
         115, 101, 115, 58, 61, 13, 10, 45, 32, 83, 114, 101, 97, 107, 61, 13, 10, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0
     ];
     let decoded = [
         115, 101, 115, 58, 45, 32, 83, 114, 101, 97, 107, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0
     ];
     let res = remove_soft_line_breaks(encoded, decoded);
     assert(res, "Expected to remove soft line breaks");
@@ -127,11 +127,11 @@ pub fn test_remove_soft_line_breaks() {
 pub fn test_return_false_incorrect_decoded_input() {
     let encoded = [
         115, 101, 115, 58, 61, 13, 10, 45, 32, 83, 114, 101, 97, 107, 61, 13, 10, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0
     ];
     let decoded = [
         115, 101, 115, 58, 45, 32, 83, 114, 101, 97, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0
     ];
     let res = remove_soft_line_breaks(encoded, decoded);
     assert(!res, "Expected to return false for incorrect decoded input");
@@ -141,11 +141,11 @@ pub fn test_return_false_incorrect_decoded_input() {
 pub fn test_handle_no_soft_line_breaks() {
     let encoded = [
         104, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0
     ];
     let decoded = [
         104, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0
     ];
     let res = remove_soft_line_breaks(encoded, decoded);
     assert(res, "Expected to handle no soft line breaks");
@@ -155,11 +155,11 @@ pub fn test_handle_no_soft_line_breaks() {
 pub fn test_handle_consecutive_soft_line_breaks() {
     let encoded = [
         104, 101, 108, 108, 111, 61, 13, 10, 61, 13, 10, 119, 111, 114, 108, 100, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     ];
     let decoded = [
         104, 101, 108, 108, 111, 119, 111, 114, 108, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0
     ];
     let res = remove_soft_line_breaks(encoded, decoded);
     assert(res, "Expected to handle consecutive soft line breaks");
@@ -169,11 +169,11 @@ pub fn test_handle_consecutive_soft_line_breaks() {
 pub fn test_handle_soft_line_break_beginning() {
     let encoded = [
         61, 13, 10, 104, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0
     ];
     let decoded = [
         104, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0
     ];
     let res = remove_soft_line_breaks(encoded, decoded);
     assert(res, "Expected to handle soft line break at beginning");
@@ -183,11 +183,11 @@ pub fn test_handle_soft_line_break_beginning() {
 pub fn test_handle_soft_line_break_end() {
     let encoded = [
         104, 101, 108, 108, 111, 61, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0
     ];
     let decoded = [
         104, 101, 108, 108, 111, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0
     ];
     let res = remove_soft_line_breaks(encoded, decoded);
     assert(res, "Expected to handle soft line break at end");
@@ -197,11 +197,11 @@ pub fn test_handle_soft_line_break_end() {
 pub fn test_handle_incomplete_line_break() {
     let encoded = [
         104, 101, 108, 108, 111, 61, 13, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0
     ];
     let decoded = [
         104, 101, 108, 108, 111, 61, 13, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0
     ];
     let res = remove_soft_line_breaks(encoded, decoded);
     assert(res, "Expected to handle incomplete line break");

@@ -71,7 +71,7 @@ mod EmailLarge {
 }
 
 mod EmailAddresses {
-    
+
     use crate::{Sequence, MAX_EMAIL_ADDRESS_LENGTH};
     global ADDRESS: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> = BoundedVec::from_array("runnier.leagues.0j@icloud.com".as_bytes());
     global ADDRESS_ONLY: [u8; 38] = comptime { "\r\nfrom:runnier.leagues.0j@icloud.com\r\n".as_bytes() };

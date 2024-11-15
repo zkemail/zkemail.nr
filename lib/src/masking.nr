@@ -9,10 +9,7 @@ use dep::std::collections::bounded_vec::BoundedVec;
  * @param mask - The mask to apply to the text
  * @return - The masked text
  */
-pub fn mask_text<let TEXT_LEN: u32>(
-    text: BoundedVec<u8, TEXT_LEN>,
-    mask: [bool; TEXT_LEN],
-) -> [u8; TEXT_LEN] {
+pub fn mask_text<let TEXT_LEN: u32>(text: BoundedVec<u8, TEXT_LEN>, mask: [bool; TEXT_LEN]) -> [u8; TEXT_LEN] {
     let mut masked_text = [0; TEXT_LEN];
     // probably fine to just iterate through whole thing without an if statement
     for i in 0..TEXT_LEN {
