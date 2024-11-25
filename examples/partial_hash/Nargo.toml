@@ -2,7 +2,7 @@
 name = "partial_hash"
 type = "bin"
 authors = ["Mach 34"]
-compiler_version = ">=0.35.0"
+compiler_version = ">=0.36.0"
 
 [dependencies]
 zkemail = { path =  "../../lib"}

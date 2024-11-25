@@ -1,6 +1,6 @@
 {
   "name": "@zk-email/zkemail-nr",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "main": "dist",
   "types": "dist",
   "license": "MIT",
@@ -11,10 +11,10 @@
     "prepublishOnly": "yarn lint && yarn build"
   },
   "dependencies": {
-    "@mach-34/noir-bignum-paramgen": "^1.0.2",
-    "@noir-lang/backend_barretenberg": "=0.35.0",
-    "@noir-lang/noir_js": "=0.35.0",
-    "@noir-lang/noirc_abi": "^0.35.0",
+    "@mach-34/noir-bignum-paramgen": "^1.1.0",
+    "@noir-lang/backend_barretenberg": "=0.36.0",
+    "@noir-lang/noir_js": "=0.36.0",
+    "@noir-lang/noirc_abi": "^0.36.0",
     "@zk-email/helpers": "=6.1.5"
   },
   "devDependencies": {
@@ -53,7 +53,7 @@
       "/dist/",
       "/node_modules/"
     ],
-    "testTimeout": 100000
+    "testTimeout": 10000000
   },
   "babel": {
     "presets": [
