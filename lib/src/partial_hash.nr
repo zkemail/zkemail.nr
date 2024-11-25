@@ -9,7 +9,7 @@ pub fn msg_u8_to_u32(msg: [u8; BLOCK_SIZE]) -> [u32; 16] {
     for i in 0..16 {
         let mut msg_field: Field = 0;
         for j in 0..4 {
-            msg_field = msg_field * 256 + msg[64 - 4*(i + 1) + j] as Field;
+            msg_field = msg_field * 256 + msg[64 - 4 * (i + 1) + j] as Field;
         }
         msg32[15 - i] = msg_field as u32;
     }
@@ -18,7 +18,11 @@ pub fn msg_u8_to_u32(msg: [u8; BLOCK_SIZE]) -> [u32; 16] {
 }
 
 // https://github.com/noir-lang/noir/blob/76eec710ff73e5e45fdddcd41ae2cd74e879cfa5/noir_stdlib/src/hash/sha256.nr#L38
-unconstrained fn build_msg_block_iter<let N: u32>(msg: [u8; N], message_size: u32, msg_start: u32) -> ([u8; BLOCK_SIZE], u32) {
+unconstrained fn build_msg_block_iter<let N: u32>(
+    msg: [u8; N],
+    message_size: u32,
+    msg_start: u32,
+) -> ([u8; BLOCK_SIZE], u32) {
     let mut msg_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
     // We insert `BLOCK_SIZE` bytes (or up to the end of the message)
     let block_input = if msg_start + BLOCK_SIZE > message_size {
@@ -44,7 +48,7 @@ fn verify_msg_block<let N: u32>(
     msg: [u8; N],
     message_size: u32,
     msg_block: [u8; 64],
-    msg_start: u32
+    msg_start: u32,
 ) -> u32 {
     let mut msg_byte_ptr: u32 = 0; // Message byte pointer
     let mut msg_end = msg_start + BLOCK_SIZE;
@@ -63,7 +67,6 @@ fn verify_msg_block<let N: u32>(
 }
 
 global BLOCK_SIZE = 64;
-global ZERO = 0;
 
 // https://github.com/noir-lang/noir/blob/76eec710ff73e5e45fdddcd41ae2cd74e879cfa5/noir_stdlib/src/hash/sha256.nr#L86-L116
 /**
@@ -78,14 +81,14 @@ global ZERO = 0;
 pub fn partial_sha256_var_start<let N: u32>(msg: [u8; N]) -> [u32; 8] {
     let num_blocks = N / BLOCK_SIZE;
     let mut msg_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
-    let mut h: [u32; 8] = [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225]; // Intermediate hash, starting with the canonical initial value
+    let mut h: [u32; 8] = [
+        1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635,
+        1541459225,
+    ]; // Intermediate hash, starting with the canonical initial value
     let mut msg_byte_ptr = 0; // Pointer into msg_block
-
     for i in 0..num_blocks {
         let msg_start = BLOCK_SIZE * i;
-        let (new_msg_block, new_msg_byte_ptr) = unsafe {
-            build_msg_block_iter(msg, N, msg_start)
-        };
+        let (new_msg_block, new_msg_byte_ptr) = unsafe { build_msg_block_iter(msg, N, msg_start) };
         if msg_start < N {
             msg_block = new_msg_block;
         }
@@ -120,17 +123,18 @@ pub fn partial_sha256_var_start<let N: u32>(msg: [u8; N]) -> [u32; 8] {
  * @param message_size - the actual length of the preimage to hash
  * @return the intermediate hash state after compressing in msg to h
  */
-pub fn partial_sha256_var_interstitial<let N: u32>(mut h: [u32; 8], msg: [u8; N], message_size: u32) -> [u32; 8] {
+pub fn partial_sha256_var_interstitial<let N: u32>(
+    mut h: [u32; 8],
+    msg: [u8; N],
+    message_size: u32,
+) -> [u32; 8] {
     assert(message_size % BLOCK_SIZE == 0, "Message size must be a multiple of the block size");
     let num_blocks = N / BLOCK_SIZE;
     let mut msg_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
     let mut msg_byte_ptr = 0; // Pointer into msg_block
-
     for i in 0..num_blocks {
         let msg_start = BLOCK_SIZE * i;
-        let (new_msg_block, new_msg_byte_ptr) = unsafe {
-            build_msg_block_iter(msg, N, msg_start)
-        };
+        let (new_msg_block, new_msg_byte_ptr) = unsafe { build_msg_block_iter(msg, N, msg_start) };
         if msg_start < N {
             msg_block = new_msg_block;
         }
@@ -147,7 +151,7 @@ pub fn partial_sha256_var_interstitial<let N: u32>(mut h: [u32; 8], msg: [u8; N]
 
         // If the block is filled, compress it.
         // An un-filled block is handled after this loop.
-        if (msg_start < N) & (msg_byte_ptr == BLOCK_SIZE) & (msg_start < message_size){
+        if (msg_start < N) & (msg_byte_ptr == BLOCK_SIZE) & (msg_start < message_size) {
             h = sha256_compression(msg_u8_to_u32(msg_block), h);
         }
     }
@@ -167,19 +171,21 @@ pub fn partial_sha256_var_interstitial<let N: u32>(mut h: [u32; 8], msg: [u8; N]
  * @param real_message_size -= the total size of the preimage
  * @return finalized sha256 hash
  */
-pub fn partial_sha256_var_end<let N: u32>(mut h: [u32; 8], msg: [u8; N], message_size: u64, real_message_size: u64) -> [u8; 32] {
+pub fn partial_sha256_var_end<let N: u32>(
+    mut h: [u32; 8],
+    msg: [u8; N],
+    message_size: u64,
+    real_message_size: u64,
+) -> [u8; 32] {
     let message_size = message_size as u32; // noir stdlib uses u64
     let real_message_size = real_message_size as u32; // noir stdlib uses u64
-
     let num_blocks = N / BLOCK_SIZE;
     let mut msg_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
     let mut msg_byte_ptr = 0; // Pointer into msg_block
-
     for i in 0..num_blocks {
         let msg_start = BLOCK_SIZE * i;
-        let (new_msg_block, new_msg_byte_ptr) = unsafe {
-            build_msg_block_iter(msg, message_size, msg_start)
-        };
+        let (new_msg_block, new_msg_byte_ptr) =
+            unsafe { build_msg_block_iter(msg, message_size, msg_start) };
         if msg_start < message_size {
             msg_block = new_msg_block;
         }
@@ -207,9 +213,8 @@ pub fn partial_sha256_var_end<let N: u32>(mut h: [u32; 8], msg: [u8; N], message
     // or our message cannot be evenly split into blocks.
     if modulo != 0 {
         let msg_start = BLOCK_SIZE * num_blocks;
-        let (new_msg_block, new_msg_byte_ptr) = unsafe {
-            build_msg_block_iter(msg, message_size, msg_start)
-        };
+        let (new_msg_block, new_msg_byte_ptr) =
+            unsafe { build_msg_block_iter(msg, message_size, msg_start) };
 
         if msg_start < message_size {
             msg_block = new_msg_block;
@@ -270,9 +275,7 @@ pub fn partial_sha256_var_end<let N: u32>(mut h: [u32; 8], msg: [u8; N], message
         msg_byte_ptr = 0;
     }
 
-    msg_block = unsafe {
-        attach_len_to_msg_block(msg_block, msg_byte_ptr, real_message_size)
-    };
+    msg_block = unsafe { attach_len_to_msg_block(msg_block, msg_byte_ptr, real_message_size) };
 
     if !is_unconstrained() {
         for i in 0..56 {
@@ -295,7 +298,7 @@ pub fn partial_sha256_var_end<let N: u32>(mut h: [u32; 8], msg: [u8; N], message
 
 unconstrained fn pad_msg_block(
     mut msg_block: [u8; BLOCK_SIZE],
-    mut msg_byte_ptr: u32
+    mut msg_byte_ptr: u32,
 ) -> ([u8; BLOCK_SIZE], u32) {
     // If i >= 57, there aren't enough bits in the current message block to accomplish this, so
     // the 1 and 0s fill up the current block, which we then compress accordingly.
@@ -310,10 +313,13 @@ unconstrained fn pad_msg_block(
     }
 }
 
-unconstrained fn attach_len_to_msg_block(mut msg_block: [u8; BLOCK_SIZE], mut msg_byte_ptr: u32, message_size: u32) -> [u8; BLOCK_SIZE] {
+unconstrained fn attach_len_to_msg_block(
+    mut msg_block: [u8; BLOCK_SIZE],
+    mut msg_byte_ptr: u32,
+    message_size: u32,
+) -> [u8; BLOCK_SIZE] {
     // We assume that `msg_byte_ptr` is less than 57 because if not then it is reset to zero before calling this function.
     // In any case, fill blocks up with zeros until the last 64 (i.e. until msg_byte_ptr = 56).
-
     for i in msg_byte_ptr..56 {
         msg_block[i] = 0;
     }
@@ -328,7 +334,6 @@ unconstrained fn attach_len_to_msg_block(mut msg_block: [u8; BLOCK_SIZE], mut ms
 
 fn hash_final_block(msg_block: [u8; BLOCK_SIZE], mut state: [u32; 8]) -> [u8; 32] {
     let mut out_h: [u8; 32] = [0; 32]; // Digest as sequence of bytes
-
     // Hash final padded block
     state = sha256_compression(msg_u8_to_u32(msg_block), state);
 
@@ -336,7 +341,7 @@ fn hash_final_block(msg_block: [u8; BLOCK_SIZE], mut state: [u32; 8]) -> [u8; 32
     for j in 0..8 {
         let h_bytes: [u8; 4] = (state[7 - j] as Field).to_le_bytes();
         for k in 0..4 {
-            out_h[31 - 4*j - k] = h_bytes[k];
+            out_h[31 - 4 * j - k] = h_bytes[k];
         }
     }
 
@@ -344,16 +349,15 @@ fn hash_final_block(msg_block: [u8; BLOCK_SIZE], mut state: [u32; 8]) -> [u8; 32
 }
 
 global DATA: [u8; 192] = [
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-    25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-    48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
-    71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93,
-    94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
-    113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130,
-    131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148,
-    149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166,
-    167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184,
-    185, 186, 187, 188, 189, 190, 191
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+    26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
+    74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97,
+    98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
+    117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135,
+    136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154,
+    155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173,
+    174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
 ];
 
 #[test]
@@ -384,7 +388,12 @@ fn test_partial_hash_interstitial() {
     }
     let pre_hash = partial_sha256_var_start(data0);
     let interstitial_hash = partial_sha256_var_interstitial(pre_hash, data1, data1.len());
-    let hash = partial_sha256_var_end(interstitial_hash, data2, data2.len() as u64, DATA.len() as u64);
+    let hash = partial_sha256_var_end(
+        interstitial_hash,
+        data2,
+        data2.len() as u64,
+        DATA.len() as u64,
+    );
     let correct_hash = std::hash::sha256_var(DATA, DATA.len() as u64);
     assert_eq(hash, correct_hash);
 }
@@ -401,7 +410,12 @@ fn test_partial_hash_interstitial_var() {
     }
     let pre_hash = partial_sha256_var_start(data0);
     let interstitial_hash = partial_sha256_var_interstitial(pre_hash, data1, 64);
-    let hash = partial_sha256_var_end(interstitial_hash, data2, data2.len() as u64, DATA.len() as u64);
+    let hash = partial_sha256_var_end(
+        interstitial_hash,
+        data2,
+        data2.len() as u64,
+        DATA.len() as u64,
+    );
     let correct_hash = std::hash::sha256_var(DATA, DATA.len() as u64);
     assert_eq(hash, correct_hash);
 }

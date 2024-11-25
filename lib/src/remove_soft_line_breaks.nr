@@ -29,9 +29,7 @@ pub fn find_zeroes<let N: u32>(encoded: [u8; N]) -> [bool; N] {
     // identify soft line breaks
     let mut is_break: [bool; N] = [false; N];
     for i in 0..N - 2 {
-        is_break[i] = (encoded[i] == 0x3D)
-            & (encoded[i + 1] == 0x0D)
-            & (encoded[i + 2] == 0x0A);
+        is_break[i] = (encoded[i] == 0x3D) & (encoded[i + 1] == 0x0D) & (encoded[i + 2] == 0x0A);
     }
 
     // find indexes of chars to zero
@@ -49,7 +47,7 @@ pub fn find_zeroes<let N: u32>(encoded: [u8; N]) -> [bool; N] {
 pub fn powers_of_r<let N: u32>(
     encoded: [u8; N],
     decoded: [u8; N],
-    should_zero: [bool; N]
+    should_zero: [bool; N],
 ) -> ([Field; N], [Field; N]) {
     // compute r
     let r = compressed_r(encoded, decoded);

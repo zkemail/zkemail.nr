@@ -1,5 +1,3 @@
-use dep::std::collections::bounded_vec::BoundedVec;
-
 /**
  * Byte masking for a header or body text
  * @dev uses fixed sized arrays for masks since saves constraints and shouldn't have security cost
