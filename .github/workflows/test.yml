@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [nightly, 0.35.0]
+        toolchain: [nightly, 0.36.0]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
