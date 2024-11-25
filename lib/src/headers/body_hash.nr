@@ -1,6 +1,8 @@
-use dep::base64::{BASE64_DECODER};
-use dep::std::collections::bounded_vec::BoundedVec;
-use crate::{Sequence, BODY_HASH_BASE64_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH, headers::constrain_header_field};
+use base64::BASE64_DECODER;
+use crate::{
+    Sequence, BODY_HASH_BASE64_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH,
+    headers::constrain_header_field,
+};
 
 /**
  * Constrained access to the body hash in the header
@@ -13,24 +15,26 @@ use crate::{Sequence, BODY_HASH_BASE64_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH, hea
 pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     header: BoundedVec<u8, MAX_HEADER_LENGTH>,
     dkim_header_field_sequence: Sequence,
-    body_hash_index: u32
+    body_hash_index: u32,
 ) -> [u8; 32] {
     // constrain the access of dkim signature field
-    let header_field_name: [u8; 14] = comptime {
-        "dkim-signature".as_bytes()
-    };
-    constrain_header_field::<MAX_HEADER_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH, 14>(header, dkim_header_field_sequence, header_field_name);
+    let header_field_name: [u8; 14] = comptime { "dkim-signature".as_bytes() };
+    constrain_header_field::<MAX_HEADER_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH, 14>(
+        header,
+        dkim_header_field_sequence,
+        header_field_name,
+    );
     // constrain access to the body hash
     assert(
         body_hash_index > dkim_header_field_sequence.index
-        & body_hash_index < dkim_header_field_sequence.end_index(), "Body hash index accessed outside of DKIM header field"
+            & body_hash_index < dkim_header_field_sequence.end_index(),
+        "Body hash index accessed outside of DKIM header field",
     );
-    let bh_prefix: [u8; 3] = comptime {
-        "bh=".as_bytes()
-    };
+    let bh_prefix: [u8; 3] = comptime { "bh=".as_bytes() };
     for i in 0..3 {
         assert(
-            header.get_unchecked(body_hash_index - 3 + i) == bh_prefix[i], "No 'bh=' prefix found at asserted bh index"
+            header.get_unchecked(body_hash_index - 3 + i) == bh_prefix[i],
+            "No 'bh=' prefix found at asserted bh index",
         );
     }
     // get the body hash
@@ -46,7 +50,7 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
  */
 pub fn get_body_hash_unsafe<let MAX_HEADER_LENGTH: u32>(
     header: BoundedVec<u8, MAX_HEADER_LENGTH>,
-    body_hash_index: u32
+    body_hash_index: u32,
 ) -> [u8; 32] {
     // get the body hash
     let mut body_hash_encoded: [u8; BODY_HASH_BASE64_LENGTH] = [0; BODY_HASH_BASE64_LENGTH];

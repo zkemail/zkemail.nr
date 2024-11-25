@@ -1,4 +1,4 @@
-use dep::std::{hash::pedersen_hash, collections::bounded_vec::BoundedVec};
+use std::hash::pedersen_hash;
 use crate::dkim::RSAPubkey;
 
 pub mod dkim;
@@ -10,8 +10,6 @@ pub mod remove_soft_line_breaks;
 mod tests;
 
 global RSA_EXPONENT: u32 = 65537;
-global KEY_BYTES_1024: u32 = 128;
-global KEY_BYTES_2048: u32 = 256;
 global KEY_LIMBS_1024: u32 = 9;
 global KEY_LIMBS_2048: u32 = 18;
 global BODY_HASH_BASE64_LENGTH: u32 = 44;
@@ -22,7 +20,7 @@ global MAX_EMAIL_ADDRESS_LENGTH: u32 = 320;
 
 pub struct Sequence {
     index: u32,
-    length: u32
+    length: u32,
 }
 
 impl Sequence {
@@ -35,19 +33,10 @@ impl Sequence {
 // "<: " = 2
 // ">\r\n" = 3
 global EMAIL_ADDRESS_CHAR_TABLE: [u8; 123] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    3, 0, 0, 3, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 1, 1, 0, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 2, 0,
-    2, 0, 3, 0, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 0, 0, 0, 0, 0, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 2, 0, 3, 0,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+    0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 ];
 
 /**
@@ -62,7 +51,7 @@ global EMAIL_ADDRESS_CHAR_TABLE: [u8; 123] = [
  */
 pub fn standard_outputs<let KEY_BYTE_LENGTH: u32>(
     pubkey: [Field; KEY_BYTE_LENGTH],
-    signature: [Field; KEY_BYTE_LENGTH]
+    signature: [Field; KEY_BYTE_LENGTH],
 ) -> [Field; 2] {
     // create pedersen hash of DKIM signing key to minimize public outputs
     let pubkey_hash = pedersen_hash(pubkey);
@@ -82,14 +71,11 @@ pub fn standard_outputs<let KEY_BYTE_LENGTH: u32>(
  * @param pubkey - The DKIM RSA Public Key modulus and reduction parameter
  * @param signature - The DKIM RSA Signature
  */
-pub fn verify_email<
-    let MAX_EMAIL_HEADER_LENGTH: u32,
-    let MAX_EMAIL_BODY_LENGTH: u32, // sometimes unused but needed for macro
-    let KEY_LIMBS: u32
->(
+pub fn verify_email<let MAX_EMAIL_HEADER_LENGTH: u32, let MAX_EMAIL_BODY_LENGTH: u32, // sometimes unused but needed for macro
+let KEY_LIMBS: u32>(
     header: BoundedVec<u8, MAX_EMAIL_HEADER_LENGTH>,
     pubkey: RSAPubkey<KEY_LIMBS_2048>,
-    signature: [Field; KEY_LIMBS_2048]
+    signature: [Field; KEY_LIMBS_2048],
 ) {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
