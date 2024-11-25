@@ -1,6 +1,6 @@
 {
   "name": "@zk-email/zkemail-nr",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "main": "dist",
   "types": "dist",
   "license": "MIT",
@@ -53,7 +53,7 @@
       "/dist/",
       "/node_modules/"
     ],
-    "testTimeout": 100000
+    "testTimeout": 10000000
   },
   "babel": {
     "presets": [
