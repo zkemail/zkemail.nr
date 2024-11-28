@@ -37,7 +37,7 @@ fn main(
     assert(body.len() <= MAX_EMAIL_BODY_LENGTH);
 
     // verify the dkim signature over the header
-    pubkey.verify_dkim_signature(header, signature);
+    let signature = pubkey.verify_dkim_signature(header, signature);
 
     // extract the body hash from the header
     let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);

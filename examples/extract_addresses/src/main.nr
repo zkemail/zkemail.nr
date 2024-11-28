@@ -34,7 +34,7 @@ fn main(
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
 
     // verify the dkim signature over the header
-    pubkey.verify_dkim_signature(header, signature);
+    let signature = pubkey.verify_dkim_signature(header, signature);
 
     // extract to and from email addresses
     let from = comptime { "from".as_bytes() };

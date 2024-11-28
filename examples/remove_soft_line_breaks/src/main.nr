@@ -36,7 +36,7 @@ fn main(
 
     // ~ 86,553 constraints
     // verify the dkim signature over the header
-    pubkey.verify_dkim_signature(header, signature);
+    let signature = pubkey.verify_dkim_signature(header, signature);
 
     // ~ 6,289 constraints
     // extract the body hash from the header
