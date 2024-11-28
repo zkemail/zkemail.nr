@@ -169,6 +169,7 @@ mod header_field_access {
 
     #[test(should_fail_with = "No 'bh=' prefix found at asserted bh index")]
     fn test_malicious_body_hash_index() {
+        // tests against "dkim-signature: v=1; a=rsa-sha256; d=example.com; s=selector; c=relaxed/relaxed; q=dns/txt; t=1683849600; x=1684454400; h=from:to:subject:date; z=From:bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=@domain.com|To:recipient@example.net|Subject:Hello|Date:Thu, 11 May 2023 15:00:00 -0700; bh=2jUSOH9NhtVGCaWpZT2ncBgaamXkef9OgICHkqfsmKY=; b="
         let (header, body_hash_index) = EmailLarge::tampered_dkim_field();
         let sequence: Sequence = Sequence { index: 0, length: header.len() }; 
         let _ = get_body_hash(header, sequence, body_hash_index);
