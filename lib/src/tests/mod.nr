@@ -167,6 +167,13 @@ mod header_field_access {
         let _ = get_body_hash(dkim_field, malicious_sequence, malicious_body_hash_index);
     }
 
+    #[test(should_fail_with = "No 'bh=' prefix found at asserted bh index")]
+    fn test_malicious_body_hash_index() {
+        let (header, body_hash_index) = EmailLarge::tampered_dkim_field();
+        let sequence: Sequence = Sequence { index: 0, length: header.len() }; 
+        let _ = get_body_hash(header, sequence, body_hash_index);
+    }
+
     #[test(should_fail_with = "Header field must end with CRLF")]
     fn test_header_field_sequence_overflow_end() {
         // make sequence extend beyond the end of the header field
