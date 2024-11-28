@@ -20,17 +20,26 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         self,
         header: BoundedVec<u8, MAX_HEADER_LENGTH>,
         signature: [Field; KEY_LIMBS_1024],
-    ) {
+    ) -> [Field; KEY_LIMBS_1024] {
         // hash the header
         let header_hash = sha256_var(header.storage(), header.len() as u64);
 
+        // instantiate pubkey
         let params: BigNumParams<KEY_LIMBS_1024, 1024> =
             BigNumParams::new(false, self.modulus, self.redc);
 
+        // instantiate signature
         let signature: RBN1024 = RuntimeBigNum::from_array(params, signature);
+
+        // modulo signature by modulus
+        let modulus: RBN1024 = RuntimeBigNum::from_array(params, self.modulus);
+        let reduced_signature = signature.umod(modulus);
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
+
+        // return the reduced signature
+        reduced_signature.get_limbs()
     }
 
     pub fn hash(self) -> Field {
@@ -55,17 +64,26 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         self,
         header: BoundedVec<u8, MAX_HEADER_LENGTH>,
         signature: [Field; KEY_LIMBS_2048],
-    ) {
+    ) -> [Field; KEY_LIMBS_2048] {
         // hash the header
         let header_hash = sha256_var(header.storage(), header.len() as u64);
 
+        // instantiate pubkey
         let params: BigNumParams<KEY_LIMBS_2048, 2048> =
             BigNumParams::new(false, self.modulus, self.redc);
 
+        // instantiate signature  
         let signature: RBN2048 = RuntimeBigNum::from_array(params, signature);
+
+        // modulo signature by modulus
+        let modulus: RBN2048 = RuntimeBigNum::from_array(params, self.modulus);
+        let reduced_signature = signature.umod(modulus);
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
+
+        // return the reduced signature
+        reduced_signature.get_limbs()
     }
 
     pub fn hash(self) -> Field {

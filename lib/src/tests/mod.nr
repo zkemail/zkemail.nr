@@ -82,6 +82,16 @@ mod test_success {
         );
         assert_eq(expected_to_address, to_address, "To address does not match expected address");
     }
+
+    #[test]
+    fn test_dkim_signature_add() {
+        let mut sig = EmailLarge::SIGNATURE;
+        let pubkey = EmailLarge::PUBKEY;
+        for i in 0..18 {
+            sig[i] += pubkey.modulus[i];
+        }
+        pubkey.verify_dkim_signature(EmailLarge::HEADER, sig);
+    }
 }
 
 mod test_tampered_hash {
@@ -413,4 +423,5 @@ mod test_address_extraction {
             from,
         );
     }
+
 }
