@@ -40,28 +40,6 @@ global EMAIL_ADDRESS_CHAR_TABLE: [u8; 123] = [
 ];
 
 /**
- * Standard outputs that essentially every email circuit will need to export (alongside app-specific outputs)
- * @notice if you only need the pubkey hash just import pedersen and hash away 
- *
- * @param pubkey - the BN limbs of the DKIM RSA pubkey
- * @param signature - the BN limbs of the DKIM RSA signature
- * @returns
- *        0: Pedersen hash of DKIM public key (root of trust)
- *        1: Pedersen hash of DKIM signature (email nullifier)
- */
-pub fn standard_outputs<let KEY_BYTE_LENGTH: u32>(
-    pubkey: [Field; KEY_BYTE_LENGTH],
-    signature: [Field; KEY_BYTE_LENGTH],
-) -> [Field; 2] {
-    // create pedersen hash of DKIM signing key to minimize public outputs
-    let pubkey_hash = pedersen_hash(pubkey);
-    // create email nullifier for email
-    let email_nullifier = pedersen_hash(signature);
-    // output the root of trust and email nullifier
-    [pubkey_hash, email_nullifier]
-}
-
-/**
  * Default email verification function
  * @dev use #[zkemail] attribute macro to apply other functionality
  *
