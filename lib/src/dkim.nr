@@ -71,7 +71,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
     pub fn hash(self) -> Field {
         let mut dkim_preimage = [0; 18];
         // compose limbs
-        for i in 0..18 {
+        for i in 0..9 {
             let modulus_hi = self.modulus[i * 2] * 2.pow_32(120);
             let redc_hi = self.redc[i * 2] * 2.pow_32(120);
             dkim_preimage[i] = modulus_hi + self.modulus[i * 2 + 1];
