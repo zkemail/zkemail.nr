@@ -87,10 +87,19 @@ mod test_success {
     fn test_dkim_signature_add() {
         let mut sig = EmailLarge::SIGNATURE;
         let pubkey = EmailLarge::PUBKEY;
+        // get sig out without adding
+        let normal_sig = pubkey.verify_dkim_signature(EmailLarge::HEADER, sig);
+        // get sig out when adding
         for i in 0..18 {
             sig[i] += pubkey.modulus[i];
         }
-        pubkey.verify_dkim_signature(EmailLarge::HEADER, sig);
+        let added_sig = pubkey.verify_dkim_signature(EmailLarge::HEADER, sig);
+        // check equal
+        assert(
+            normal_sig == added_sig,
+            "Adding pubkey modulus to signature should not change signature used for nullifier",
+        );
+
     }
 }
 
