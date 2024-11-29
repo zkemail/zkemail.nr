@@ -74,8 +74,9 @@ global BLOCK_SIZE = 64;
  * @notice can be used for post-partial hashing where client proves part of hash and relies on server to finish
  * 
  *
- * @param N: the maximum length of the message to hash. NOTE: N must be N % BLOCK_SIZE == 0 otherwise the remaining
- *           bytes will not be inputted when computing the hash
+ * @param N: the maximum length of the message to hash.
+ *  --- WARNING: N must be divisible by BLOCK_SIZE such that N % BLOCK_SIZE == 0 
+ *      otherwise the remaining bytes will not be inputted when computing the initial hash
  * @param msg: the preimage to begin hashing
  * @return the intermediate hash state
  */
