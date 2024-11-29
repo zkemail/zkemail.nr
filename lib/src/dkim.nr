@@ -15,9 +15,7 @@ impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
     }
 
     pub fn validate_range(self, signature: [Field; KEY_LIMBS]) {
-        for i in 0..KEY_LIMBS {
-
-        }
+        for i in 0..KEY_LIMBS {}
     }
 }
 
@@ -55,8 +53,6 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         // hash the pubkey
         pedersen_hash(dkim_preimage)
     }
-
-    
 }
 
 impl RSAPubkey<KEY_LIMBS_2048> {
