@@ -27,22 +27,23 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     // constrain access to the body hash
     assert(
         body_hash_index > dkim_header_field_sequence.index
-            & body_hash_index + BODY_HASH_BASE64_LENGTH < dkim_header_field_sequence.end_index() + 1,
-        "Body hash index accessed outside of DKIM header field",
-    );
-    let bh_prefix: [u8; 5] = comptime { "; bh=".as_bytes() };
-    for i in 0..5 {
-        let character = header.get_unchecked(body_hash_index - 5 + i);
-        assert(character == bh_prefix[i], "No 'bh=' prefix found at asserted bh index");
+            & body_hash_index + BODY_HASH_BASE64_LENGTH < dkim_header_field_sequence.end_index() + 1
+            ,
+            "Body hash index accessed outside of DKIM header field",
+        );
+        let bh_prefix: [u8; 5] = comptime { "; bh=".as_bytes() };
+        for i in 0..5 {
+            let character = header.get_unchecked(body_hash_index - 5 + i);
+            assert(character == bh_prefix[i], "No 'bh=' prefix found at asserted bh index");
+        }
+        let bh_suffix: u8 = comptime { ";".as_bytes()[0] };
+        assert(
+            header.get_unchecked(body_hash_index + BODY_HASH_BASE64_LENGTH) == bh_suffix,
+            "No ';' suffix found at asserted bh index",
+        );
+        // get the body hash
+        get_body_hash_unsafe(header, body_hash_index)
     }
-    let bh_suffix: u8 = comptime { ";".as_bytes()[0] };
-    assert(
-        header.get_unchecked(body_hash_index + BODY_HASH_BASE64_LENGTH) == bh_suffix,
-        "No ';' suffix found at asserted bh index",
-    );
-    // get the body hash
-    get_body_hash_unsafe(header, body_hash_index)
-}
 
 /**
  * Get the body hash from the header without validating the access index
