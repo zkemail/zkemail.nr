@@ -14,8 +14,8 @@ impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
         Self { modulus, redc }
     }
 
-    pub fn hash(self) -> Field {
-        pedersen_hash(self.modulus)
+    pub fn validate_range(self, signature: [Field; KEY_LIMBS]) {
+        for i in 0..KEY_LIMBS {}
     }
 }
 
@@ -32,9 +32,26 @@ impl RSAPubkey<KEY_LIMBS_1024> {
             BigNumParams::new(false, self.modulus, self.redc);
 
         let signature: RBN1024 = RuntimeBigNum::from_array(params, signature);
+        signature.validate_in_range();
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
+    }
+
+    pub fn hash(self) -> Field {
+        let mut dkim_preimage = [0; 9];
+        // compose first 4 limbs of modulus and redc
+        for i in 0..4 {
+            let modulus_hi = self.modulus[i * 2] * 2.pow_32(120);
+            let redc_hi = self.redc[i * 2] * 2.pow_32(120);
+            dkim_preimage[i] = modulus_hi + self.modulus[i * 2 + 1];
+            dkim_preimage[i + 4] = redc_hi + self.redc[i * 2 + 1];
+        }
+        // compose last two elements of redc and modulus together
+        let modulus_hi = self.modulus[8] * 2.pow_32(120);
+        dkim_preimage[8] = modulus_hi + self.redc[8];
+        // hash the pubkey
+        pedersen_hash(dkim_preimage)
     }
 }
 
@@ -51,8 +68,22 @@ impl RSAPubkey<KEY_LIMBS_2048> {
             BigNumParams::new(false, self.modulus, self.redc);
 
         let signature: RBN2048 = RuntimeBigNum::from_array(params, signature);
+        signature.validate_in_range();
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
+    }
+
+    pub fn hash(self) -> Field {
+        let mut dkim_preimage = [0; 18];
+        // compose limbs
+        for i in 0..9 {
+            let modulus_hi = self.modulus[i * 2] * 2.pow_32(120);
+            let redc_hi = self.redc[i * 2] * 2.pow_32(120);
+            dkim_preimage[i] = modulus_hi + self.modulus[i * 2 + 1];
+            dkim_preimage[i + 9] = redc_hi + self.redc[i * 2 + 1];
+        }
+        // hash the pubkey
+        pedersen_hash(dkim_preimage)
     }
 }

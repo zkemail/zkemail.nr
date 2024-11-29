@@ -1,8 +1,8 @@
-use base64::BASE64_DECODER;
 use crate::{
-    Sequence, BODY_HASH_BASE64_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH,
-    headers::constrain_header_field,
+    BODY_HASH_BASE64_LENGTH, headers::constrain_header_field, MAX_DKIM_HEADER_FIELD_LENGTH,
+    Sequence,
 };
+use base64::BASE64_DECODER;
 
 /**
  * Constrained access to the body hash in the header
@@ -27,16 +27,19 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     // constrain access to the body hash
     assert(
         body_hash_index > dkim_header_field_sequence.index
-            & body_hash_index < dkim_header_field_sequence.end_index(),
+            & body_hash_index < dkim_header_field_sequence.end_index() + 1,
         "Body hash index accessed outside of DKIM header field",
     );
-    let bh_prefix: [u8; 3] = comptime { "bh=".as_bytes() };
-    for i in 0..3 {
-        assert(
-            header.get_unchecked(body_hash_index - 3 + i) == bh_prefix[i],
-            "No 'bh=' prefix found at asserted bh index",
-        );
+    let bh_prefix: [u8; 5] = comptime { "; bh=".as_bytes() };
+    for i in 0..5 {
+        let character = header.get_unchecked(body_hash_index - 5 + i);
+        assert(character == bh_prefix[i], "No 'bh=' prefix found at asserted bh index");
     }
+    let bh_suffix: u8 = comptime { ";".as_bytes()[0] };
+    assert(
+        header.get_unchecked(body_hash_index + BODY_HASH_BASE64_LENGTH) == bh_suffix,
+        "No ';' suffix found at asserted bh index",
+    );
     // get the body hash
     get_body_hash_unsafe(header, body_hash_index)
 }
