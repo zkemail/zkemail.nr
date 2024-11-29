@@ -72,10 +72,11 @@ global BLOCK_SIZE = 64;
 /**
  * Partially computes a SHA256 hash of a message but does not finalize
  * @notice can be used for post-partial hashing where client proves part of hash and relies on server to finish
+ * 
  *
- * @param N: the maximum length of the message to hash
+ * @param N: the maximum length of the message to hash. NOTE: N must be N % BLOCK_SIZE == 0 otherwise the remaining
+ *           bytes will not be inputted when computing the hash
  * @param msg: the preimage to begin hashing
- * @param message_size: the actual length of the preimage to hash
  * @return the intermediate hash state
  */
 pub fn partial_sha256_var_start<let N: u32>(msg: [u8; N]) -> [u32; 8] {
