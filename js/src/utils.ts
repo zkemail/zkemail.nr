@@ -8,7 +8,7 @@ export type BoundedVec = {
   len: string;
 };
 /**
- * Transforms a u32 array to a u8 array
+ * Transforms a u32 array to a u8 array in big-endian format
  * @dev sha-utils in zk-email-verify encodes partial hash as u8 array but noir expects u32
  *      transform back to keep upstream code but not have noir worry about transformation
  *
