@@ -8,7 +8,7 @@ export type BoundedVec = {
   len: string;
 };
 /**
- * Transforms a u32 array to a u8 array
+ * Transforms a u32 array to a u8 array in big-endian format
  * @dev sha-utils in zk-email-verify encodes partial hash as u8 array but noir expects u32
  *      transform back to keep upstream code but not have noir worry about transformation
  *
@@ -111,6 +111,7 @@ export function getAddressHeaderSequence(
 
 /**
  * Build a ROM table for allowable email characters
+ * === This function is used to generate a table to reference in Noir code ===
  */
 export function makeEmailAddressCharTable(): string {
   // max value: z = 122
@@ -119,7 +120,7 @@ export function makeEmailAddressCharTable(): string {
   const emailChars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-@";
   const precedingChars = "<: ";
-  const procedingChars = ">\r\n";
+  const proceedingChars = ">\r\n";
   // set valid email chars
   for (let i = 0; i < emailChars.length; i++) {
     table[emailChars.charCodeAt(i)] = 1;
@@ -129,11 +130,10 @@ export function makeEmailAddressCharTable(): string {
     table[precedingChars.charCodeAt(i)] = 2;
   }
   // set valid proceding chars
-  for (let i = 0; i < procedingChars.length; i++) {
-    table[procedingChars.charCodeAt(i)] = 3;
+  for (let i = 0; i < proceedingChars.length; i++) {
+    table[proceedingChars.charCodeAt(i)] = 3;
   }
   let tableStr = `global EMAIL_ADDRESS_CHAR_TABLE: [u8; ${tableLength}] = [\n`;
-  console.log();
   for (let i = 0; i < table.length; i += 10) {
     const end = i + 10 < table.length ? i + 10 : table.length;
     tableStr += `    ${table.slice(i, end).join(", ")},\n`;
@@ -141,7 +141,3 @@ export function makeEmailAddressCharTable(): string {
   tableStr += "];";
   return tableStr;
 }
-
-// export function computeStandardOutputs(email: Buffer): Promise<[bigint, bigint]> {
-
-// }

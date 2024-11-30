@@ -1,15 +1,15 @@
 use dep::std::{
-    meta::unquote, collections::umap::UHashMap,
-    hash::{BuildHasherDefault, poseidon2::Poseidon2Hasher}, option::Option,
+    collections::umap::UHashMap, hash::{BuildHasherDefault, poseidon2::Poseidon2Hasher},
+    meta::unquote, option::Option,
 };
 
-use dep::std::{
-    collections::bounded_vec::BoundedVec, hash::{sha256_var, pedersen_hash}, panic::panic,
-};
+use crate::{KEY_BYTES_1024, KEY_LIMBS_1024, RSA_EXPONENT};
 use dep::rsa::{
-    bignum::{fields::{Params1024, Params2048}, runtime_bignum::BigNumInstance, BigNum}, types::RSA,
+    bignum::{BigNum, fields::{Params1024, Params2048}, runtime_bignum::BigNumInstance}, types::RSA,
 };
-use crate::{KEY_LIMBS_1024, KEY_BYTES_1024, RSA_EXPONENT};
+use dep::std::{
+    collections::bounded_vec::BoundedVec, hash::{pedersen_hash, sha256_var}, panic::panic,
+};
 
 type BN1024 = BigNum<KEY_LIMBS_1024, Params1024>;
 type RSA1024 = RSA<BN1024, BigNumInstance<KEY_LIMBS_1024, Params1024>, KEY_BYTES_1024>;
