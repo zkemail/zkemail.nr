@@ -4,8 +4,7 @@ mod test_success {
 
     use crate::{
         headers::{body_hash::get_body_hash, email_address::get_email_address},
-        MAX_EMAIL_ADDRESS_LENGTH,
-        partial_hash::partial_sha256_var_end,
+        MAX_EMAIL_ADDRESS_LENGTH, partial_hash::partial_sha256_var_end,
         tests::test_inputs::EmailLarge,
     };
     use std::hash::sha256_var;
