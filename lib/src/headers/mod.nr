@@ -18,13 +18,8 @@ pub fn constrain_header_field<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_L
     header_field_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) {
-    // check that the sequence is within bounds
-    assert(
-        header_field_sequence.index + header_field_sequence.length <= header.len(),
-        "Header field out of bounds",
-    );
     // check the range of the sequence is within the header (so we can use get_unchecked)
-    let end_index = header_field_sequence.index + header_field_sequence.length;
+    let end_index = header_field_sequence.end_index();
     assert(end_index <= header.len(), "Header field out of bounds of header");
 
     // if the sequence is not the start, check for a newline
@@ -59,27 +54,22 @@ pub fn constrain_header_field<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_L
     for i in 0..MAX_HEADER_FIELD_LENGTH {
         // is it safe enough to cut this constraint cost in half by not checking lf? i think so
         let index = start_index + i;
-        if (index < header_field_sequence.index + header_field_sequence.length) {
+        if (index < end_index) {
             assert(header.get_unchecked(index) != CR, "Header field must not contain newlines");
         }
     }
 }
 
 /**
- * contrain_header_field with checks for the last occurence of "<" inside the loop to save constraints
+ * constrain_header_field with checks for the last occurence of "<" inside the loop to save constraints
  */
 pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
     header: BoundedVec<u8, MAX_HEADER_LENGTH>,
     header_field_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) -> u32 {
-    // check that the sequence is within bounds
-    assert(
-        header_field_sequence.index + header_field_sequence.length <= header.len(),
-        "Header field out of bounds",
-    );
     // check the range of the sequence is within the header (so we can use get_unchecked)
-    let end_index = header_field_sequence.index + header_field_sequence.length;
+    let end_index = header_field_sequence.end_index();
     assert(end_index <= header.len(), "Header field out of bounds of header");
 
     // if the sequence is not the start, check for a newline
@@ -115,7 +105,7 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
     for i in (HEADER_FIELD_NAME_LENGTH + 1)..MAX_HEADER_FIELD_LENGTH {
         // is it safe enough to cut this constraint cost in half by not checking lf? i think so
         let index = start_index + i;
-        if (index < header_field_sequence.index + header_field_sequence.length) {
+        if (index < end_index) {
             let byte = header.get_unchecked(index);
             assert(byte != CR, "Header field must not contain newlines");
             if byte == 0x3c {
