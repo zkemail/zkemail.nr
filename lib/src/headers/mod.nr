@@ -3,7 +3,6 @@ use crate::{CR, LF, Sequence};
 pub mod body_hash;
 pub mod email_address;
 
-
 /**
  * Constrain a sequence in a header to be within the correct bounds
  *
@@ -14,9 +13,8 @@ pub mod email_address;
  * @param header_field_sequence - The sequence of the header field
  * @param header_field_name - The name of the header field
  */
-fn check_header_field_bounds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>
-(
-    header: BoundedVec<u8, MAX_HEADER_LENGTH>, 
+fn check_header_field_bounds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
     header_field_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) {
@@ -71,7 +69,11 @@ pub fn constrain_header_field<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_L
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) {
     // constrain beginning of header field
-    check_header_field_bounds::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(header, header_field_sequence, header_field_name);
+    check_header_field_bounds::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+        header,
+        header_field_sequence,
+        header_field_name,
+    );
 
     // check the header field is uninterrupted
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
@@ -93,7 +95,11 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) -> u32 {
     // constrain beginning of header field
-    check_header_field_bounds::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(header, header_field_sequence, header_field_name);
+    check_header_field_bounds::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+        header,
+        header_field_sequence,
+        header_field_name,
+    );
 
     // check the header field is uninterrupted
     let mut last_angle_bracket = 0;
