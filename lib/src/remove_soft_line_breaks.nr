@@ -1,3 +1,4 @@
+use crate::{CR, LF};
 use nodash::array::pack_bytes;
 use std::hash::poseidon2::Poseidon2;
 
@@ -29,14 +30,14 @@ pub fn find_zeroes<let N: u32>(encoded: [u8; N]) -> [bool; N] {
     // identify soft line breaks
     let mut is_break: [bool; N] = [false; N];
     for i in 0..N - 2 {
-        is_break[i] = (encoded[i] == 0x3D) & (encoded[i + 1] == 0x0D) & (encoded[i + 2] == 0x0A);
+        is_break[i] = (encoded[i] == 0x3D) & (encoded[i + 1] == CR) & (encoded[i + 2] == LF);
     }
 
     // find indexes of chars to zero
     let mut should_zero: [bool; N] = [false; N];
     should_zero[0] = is_break[0];
     should_zero[1] = is_break[1] + is_break[0];
-    should_zero[N - 1] = is_break[N - 2] + is_break[N - 3];
+    should_zero[N - 1] = is_break[N - 3];
     for i in 2..N - 1 {
         should_zero[i] = is_break[i] + is_break[i - 1] + is_break[i - 2];
     }

@@ -1,6 +1,6 @@
 use crate::{
-    Sequence, MAX_EMAIL_ADDRESS_LENGTH, EMAIL_ADDRESS_CHAR_TABLE,
-    headers::constrain_header_field_detect_last_angle_bracket,
+    EMAIL_ADDRESS_CHAR_TABLE, headers::constrain_header_field_detect_last_angle_bracket,
+    MAX_EMAIL_ADDRESS_LENGTH, Sequence,
 };
 
 pub fn get_email_address<let MAX_HEADER_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
