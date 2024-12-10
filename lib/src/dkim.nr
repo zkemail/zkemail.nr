@@ -67,7 +67,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         let params: BigNumParams<KEY_LIMBS_2048, 2048> =
             BigNumParams::new(false, self.modulus, self.redc);
 
-        let signature: RBN2048 = RuntimeBigNum::from_array(params, signature);
+        let signature = RuntimeBigNum::from_array(params, signature);
         signature.validate_in_range();
 
         // verify the DKIM signature over the header
