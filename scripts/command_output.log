@@ -1,0 +1,5 @@
+Command: cd scripts/
+Output:
+bash: cd: scripts/: No such file or directory
+Exit Code: 1
+----
