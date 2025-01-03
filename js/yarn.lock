@@ -1922,10 +1922,10 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@zk-email/helpers@=6.1.5":
-  version "6.1.5"
-  resolved "https://registry.yarnpkg.com/@zk-email/helpers/-/helpers-6.1.5.tgz#f777f5cd9b96a55fa18e8520e104d4ef84a3d5b0"
-  integrity sha512-DaUQPdQKxI38QOIuce88kiEoQHZ/bEej34wUofmGqB0XlXVky1oFvvmF2MjJdDjuNScSL86QVR2WP06IIaLeJg==
+"@zk-email/helpers@^6.3.2":
+  version "6.3.2"
+  resolved "https://registry.yarnpkg.com/@zk-email/helpers/-/helpers-6.3.2.tgz#d085b848618093029338466724ead296c82676dd"
+  integrity sha512-NvPohN7/oOB+F5B/IFcNjFY4L+pjfDE7j0wr5s3ciuX6BAZLrle0J0d1yKXIeBomGLbC6k2Vov517m3M0lj8BQ==
   dependencies:
     addressparser "^1.0.1"
     atob "^2.1.2"
