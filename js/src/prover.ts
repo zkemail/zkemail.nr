@@ -1,16 +1,10 @@
-import {
-  BarretenbergBackend,
-  CompiledCircuit,
-  ProofData,
-  UltraHonkBackend,
-} from "@noir-lang/backend_barretenberg";
-import { Noir } from "@noir-lang/noir_js";
-import { InputValue, InputMap } from "@noir-lang/noirc_abi";
+import { UltraPlonkBackend, UltraHonkBackend, ProofData } from "@aztec/bb.js";
+import { Noir, InputMap, CompiledCircuit } from "@noir-lang/noir_js";
 
 type ProvingBackend = "honk" | "plonk" | "all";
 
 export class ZKEmailProver {
-  private plonk?: BarretenbergBackend;
+  private plonk?: UltraPlonkBackend;
 
   private honk?: UltraHonkBackend;
 
@@ -24,10 +18,10 @@ export class ZKEmailProver {
   ) {
     // initialize the backends
     if (provingBackend === "plonk" || provingBackend === "all") {
-      this.plonk = new BarretenbergBackend(circuit);
+      this.plonk = new UltraPlonkBackend(circuit.bytecode);
     }
     if (provingBackend === "honk" || provingBackend === "all") {
-      this.honk = new UltraHonkBackend(circuit);
+      this.honk = new UltraHonkBackend(circuit.bytecode);
     }
     // initialize the Noir instance
     this.noir = new Noir(circuit);
@@ -57,7 +51,7 @@ export class ZKEmailProver {
     provingBackend?: ProvingBackend
   ): Promise<ProofData> {
     // determine proving backend to use
-    let backend: BarretenbergBackend | UltraHonkBackend;
+    let backend: UltraPlonkBackend | UltraHonkBackend;
     if (
       (provingBackend && this.plonk) ||
       (this.provingBackend === "plonk" && this.plonk)
@@ -103,7 +97,7 @@ export class ZKEmailProver {
     provingBackend?: ProvingBackend
   ): Promise<boolean> {
     // determine proving backend to use
-    let backend: BarretenbergBackend | UltraHonkBackend;
+    let backend: UltraHonkBackend | UltraPlonkBackend;
     if (
       (provingBackend && this.plonk) ||
       (this.provingBackend === "plonk" && this.plonk)
