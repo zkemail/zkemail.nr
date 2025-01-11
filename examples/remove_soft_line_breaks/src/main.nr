@@ -1,8 +1,8 @@
-use zkemail::{
-    KEY_LIMBS_2048, dkim::RSAPubkey, headers::body_hash::get_body_hash,
-    standard_outputs, Sequence, remove_soft_line_breaks::remove_soft_line_breaks
-};
 use std::hash::sha256_var;
+use zkemail::{
+    dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048,
+    remove_soft_line_breaks::remove_soft_line_breaks, Sequence, standard_outputs,
+};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
@@ -28,7 +28,7 @@ fn main(
     pubkey: RSAPubkey<KEY_LIMBS_2048>,
     signature: [Field; KEY_LIMBS_2048],
     body_hash_index: u32,
-    dkim_header_sequence: Sequence
+    dkim_header_sequence: Sequence,
 ) -> pub [Field; 2] {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
@@ -48,14 +48,15 @@ fn main(
 
     // compare the body hashes
     assert(
-        signed_body_hash == computed_body_hash, "SHA256 hash computed over body does not match body hash found in DKIM-signed header"
+        signed_body_hash == computed_body_hash,
+        "SHA256 hash computed over body does not match body hash found in DKIM-signed header",
     );
 
     // ~ 37,982 constraints
     // ensure the decoded body is the same as the original body
     assert(
         remove_soft_line_breaks(body.storage(), decoded_body.storage()),
-        "Decoded body does not properly remove soft line breaks"
+        "Decoded body does not properly remove soft line breaks",
     );
 
     // ~ 10,255 constraints

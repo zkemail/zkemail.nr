@@ -1,9 +1,12 @@
-use dep::zkemail::{
-    KEY_LIMBS_2048, dkim::RSAPubkey,
-    headers::{body_hash::get_body_hash, email_address::get_email_address}, standard_outputs, Sequence,
-    MAX_EMAIL_ADDRESS_LENGTH
-};
 use dep::std::{collections::bounded_vec::BoundedVec, hash::sha256_var};
+use dep::zkemail::{
+    dkim::RSAPubkey,
+    headers::{body_hash::get_body_hash, email_address::get_email_address},
+    KEY_LIMBS_2048,
+    MAX_EMAIL_ADDRESS_LENGTH,
+    Sequence,
+    standard_outputs,
+};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
@@ -30,8 +33,8 @@ fn main(
     from_header_sequence: Sequence,
     from_address_sequence: Sequence,
     to_header_sequence: Sequence,
-    to_address_sequence: Sequence
-) -> pub ([Field; 2], BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>, BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>) {
+    to_address_sequence: Sequence,
+    ) -> pub ([Field; 2], BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>, BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>) {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
 
@@ -39,12 +42,8 @@ fn main(
     pubkey.verify_dkim_signature(header, signature);
 
     // extract to and from email addresses
-    let from = comptime {
-        "from".as_bytes()
-    };
-    let to = comptime {
-        "to".as_bytes()
-    };
+    let from = comptime { "from".as_bytes() };
+    let to = comptime { "to".as_bytes() };
     // 16k gate cost? has to be able to be brought down
     let from_address = get_email_address(header, from_header_sequence, from_address_sequence, from);
     let to_address = get_email_address(header, to_header_sequence, to_address_sequence, to);
