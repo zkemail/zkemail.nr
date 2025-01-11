@@ -1,6 +1,6 @@
 pub(crate) mod EmailLarge {
 
-    use crate::{Sequence, KEY_LIMBS_2048, dkim::RSAPubkey};
+    use crate::{dkim::RSAPubkey, KEY_LIMBS_2048, Sequence};
 
     // regular inputs
     pub(crate) global EMAIL_LARGE_MAX_HEADER_LENGTH: u32 = 512;
@@ -182,7 +182,7 @@ pub(crate) mod EmailLarge {
 
 pub(crate) mod EmailAddresses {
 
-    use crate::{Sequence, MAX_EMAIL_ADDRESS_LENGTH};
+    use crate::{MAX_EMAIL_ADDRESS_LENGTH, Sequence};
     pub(crate) global ADDRESS: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> =
         BoundedVec::from_array("runnier.leagues.0j@icloud.com".as_bytes());
     pub(crate) global ADDRESS_ONLY: [u8; 38] =
@@ -202,5 +202,6 @@ pub(crate) mod EmailAddresses {
     pub(crate) global BRACKETS_ADDRESS_SEQUENCE: Sequence = Sequence { index: 21, length: 29 };
     pub(crate) global QUOTES_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 62 };
     pub(crate) global QUOTES_ADDRESS_SEQUENCE: Sequence = Sequence { index: 35, length: 29 };
-    pub(crate) global MALICIOUS_QUOTES_ADDRESS_SEQUENCE: Sequence = Sequence { index: 8, length: 24 };
+    pub(crate) global MALICIOUS_QUOTES_ADDRESS_SEQUENCE: Sequence =
+        Sequence { index: 8, length: 24 };
 }

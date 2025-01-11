@@ -1,8 +1,8 @@
-use base64::BASE64_DECODER;
 use crate::{
-    Sequence, BODY_HASH_BASE64_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH,
-    headers::constrain_header_field,
+    BODY_HASH_BASE64_LENGTH, headers::constrain_header_field, MAX_DKIM_HEADER_FIELD_LENGTH,
+    Sequence,
 };
+use base64::BASE64_DECODER;
 
 /**
  * Constrained access to the body hash in the header

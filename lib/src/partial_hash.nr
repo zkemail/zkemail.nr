@@ -1,5 +1,5 @@
-use std::runtime::is_unconstrained;
 use std::hash::sha256_compression;
+use std::runtime::is_unconstrained;
 
 // https://github.com/noir-lang/noir/blob/76eec710ff73e5e45fdddcd41ae2cd74e879cfa5/noir_stdlib/src/hash/sha256.nr#L23
 // Convert 64-byte array to array of 16 u32s
