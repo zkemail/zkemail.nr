@@ -2,10 +2,10 @@
 name = "zkemail.nr"
 type = "lib"
 authors = ["Mach 34"]
-compiler_version = ">=0.36.0"
+compiler_version = ">=1.0.0"
 
 [dependencies]
-bignum = { tag = "v0.4.1", git = "https://github.com/noir-lang/noir-bignum" }
-rsa = { tag = "v0.4.0", git = "https://github.com/noir-lang/noir_rsa", directory = "lib" }
-base64 = { tag = "v0.3.0", git = "https://github.com/noir-lang/noir_base64" }
-nodash = { tag = "v0.36.0", git = "https://github.com/olehmisar/nodash" }
+bignum = { tag = "v0.5.0", git = "https://github.com/noir-lang/noir-bignum" }
+rsa = { tag = "v0.5.0", git = "https://github.com/noir-lang/noir_rsa", directory = "lib" }
+base64 = { tag = "v0.3.1", git = "https://github.com/noir-lang/noir_base64" }
+nodash = { tag = "v0.39.3", git = "https://github.com/olehmisar/nodash" }
