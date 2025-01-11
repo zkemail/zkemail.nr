@@ -2,7 +2,7 @@
 name = "remove_soft_line_breaks"
 type = "bin"
 authors = ["Mach 34"]
-compiler_version = ">=0.36.0"
+compiler_version = ">=1.0.0"
 
 [dependencies]
 zkemail = { path =  "../../lib"}
