@@ -37,7 +37,7 @@ pub fn find_zeroes<let N: u32>(encoded: [u8; N]) -> [bool; N] {
     let mut should_zero: [bool; N] = [false; N];
     should_zero[0] = is_break[0];
     should_zero[1] = is_break[1] + is_break[0];
-    should_zero[N - 1] = is_break[N - 2] + is_break[N - 3];
+    should_zero[N - 1] = is_break[N - 3];
     for i in 2..N - 1 {
         should_zero[i] = is_break[i] + is_break[i - 1] + is_break[i - 2];
     }
