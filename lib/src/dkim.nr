@@ -13,6 +13,10 @@ impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
     pub fn new(modulus: [Field; KEY_LIMBS], redc: [Field; KEY_LIMBS]) -> Self {
         Self { modulus, redc }
     }
+
+    pub fn validate_range(self, signature: [Field; KEY_LIMBS]) {
+        for i in 0..KEY_LIMBS {}
+    }
 }
 
 impl RSAPubkey<KEY_LIMBS_1024> {
@@ -28,6 +32,7 @@ impl RSAPubkey<KEY_LIMBS_1024> {
             BigNumParams::new(false, self.modulus, self.redc);
 
         let signature: RBN1024 = RuntimeBigNum::from_array(params, signature);
+        signature.validate_in_range();
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
@@ -63,6 +68,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
             BigNumParams::new(false, self.modulus, self.redc);
 
         let signature: RBN2048 = RuntimeBigNum::from_array(params, signature);
+        signature.validate_in_range();
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));

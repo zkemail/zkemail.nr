@@ -116,6 +116,16 @@ mod test_tampered_hash {
             "SHA256 hash should not match tampered body hash",
         );
     }
+
+    #[test(should_fail_with = "all to assert_max_bit_size")]
+    fn test_dkim_signature_unnormalized() {
+        let mut sig = EmailLarge::SIGNATURE;
+        let pubkey = EmailLarge::PUBKEY;
+        let delta = 1;
+        sig[0] += delta * 0x1000000000000000000000000000000;
+        sig[1] -= delta;
+        pubkey.verify_dkim_signature(EmailLarge::HEADER, sig);
+    }
 }
 
 mod header_field_access {
