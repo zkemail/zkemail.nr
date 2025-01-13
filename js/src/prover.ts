@@ -1,5 +1,6 @@
 import { UltraPlonkBackend, UltraHonkBackend, ProofData } from "@aztec/bb.js";
 import { Noir, InputMap, CompiledCircuit } from "@noir-lang/noir_js";
+import { InputValue } from "@noir-lang/noirc_abi";
 
 type ProvingBackend = "honk" | "plonk" | "all";
 
