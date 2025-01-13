@@ -46,7 +46,8 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     }
 
 /**
- * Get the body hash from the header without validating the access index
+ * Get the body hash from the header without validating the access index. Does not validate body
+ * hash is valid base64 sequence (https://github.com/noir-lang/noir_base64/blob/4431d08ac661ada9d8d18b115487ff0190b43856/src/lib.nr#L209-L232)
  *
  * @param MAX_HEADER_LENGTH - The maximum length of the email header
  * @param header - The email header as validated in the DKIM signature
