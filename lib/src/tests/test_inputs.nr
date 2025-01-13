@@ -134,7 +134,7 @@ pub(crate) mod EmailLarge {
         0xb9,
     ];
     pub(crate) global BODY_HASH_INDEX: u32 = 361;
-    pub(crate) global DKIM_HEADER_SEQUENCE = Sequence { index: 267, length: 203 };
+    pub(crate) global DKIM_HEADER_SEQUENCE: Sequence = Sequence { index: 267, length: 203 };
     // partial hash inputs
     pub(crate) global EMAIL_LARGE_MAX_PARTIAL_BODY_LENGTH: u32 = 192;
     pub(crate) global PARTIAL_BODY_HASH: [u32; 8] = [
@@ -155,10 +155,10 @@ pub(crate) mod EmailLarge {
         ],
     );
     // email address inputs
-    pub(crate) global FROM_HEADER_SEQUENCE = Sequence { index: 0, length: 34 };
-    pub(crate) global FROM_ADDRESS_SEQUENCE = Sequence { index: 5, length: 29 };
-    pub(crate) global TO_HEADER_SEQUENCE = Sequence { index: 244, length: 21 };
-    pub(crate) global TO_ADDRESS_SEQUENCE = Sequence { index: 247, length: 18 };
+    pub(crate) global FROM_HEADER_SEQUENCE: Sequence = Sequence { index: 0, length: 34 };
+    pub(crate) global FROM_ADDRESS_SEQUENCE: Sequence = Sequence { index: 5, length: 29 };
+    pub(crate) global TO_HEADER_SEQUENCE: Sequence = Sequence { index: 244, length: 21 };
+    pub(crate) global TO_ADDRESS_SEQUENCE: Sequence = Sequence { index: 247, length: 18 };
 
     // mutate inputs
 
@@ -219,15 +219,16 @@ pub(crate) mod EmailAddresses {
     pub(crate) global QUOTES: [u8; 66] = comptime {
         "\r\nfrom:\"president@whitehouse.gov\" <runnier.leagues.0j@icloud.com\r\n".as_bytes()
     };
-    pub(crate) global ADDRESS_ONLY_FIELD_SEQUENCE = Sequence { index: 2, length: 34 };
-    pub(crate) global ADDRESS_ONLY_ADDRESS_SEQUENCE = Sequence { index: 7, length: 29 };
-    pub(crate) global NO_BRACKETS_FIELD_SEQUENCE = Sequence { index: 2, length: 47 };
-    pub(crate) global NO_BRACKETS_ADDRESS_SEQUENCE = Sequence { index: 20, length: 29 };
-    pub(crate) global BRACKETS_FIELD_SEQUENCE = Sequence { index: 2, length: 48 };
-    pub(crate) global BRACKETS_ADDRESS_SEQUENCE = Sequence { index: 21, length: 29 };
-    pub(crate) global QUOTES_FIELD_SEQUENCE = Sequence { index: 2, length: 62 };
-    pub(crate) global QUOTES_ADDRESS_SEQUENCE = Sequence { index: 35, length: 29 };
-    pub(crate) global MALICIOUS_QUOTES_ADDRESS_SEQUENCE = Sequence { index: 8, length: 24 };
+    pub(crate) global ADDRESS_ONLY_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 34 };
+    pub(crate) global ADDRESS_ONLY_ADDRESS_SEQUENCE: Sequence = Sequence { index: 7, length: 29 };
+    pub(crate) global NO_BRACKETS_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 47 };
+    pub(crate) global NO_BRACKETS_ADDRESS_SEQUENCE: Sequence = Sequence { index: 20, length: 29 };
+    pub(crate) global BRACKETS_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 48 };
+    pub(crate) global BRACKETS_ADDRESS_SEQUENCE: Sequence = Sequence { index: 21, length: 29 };
+    pub(crate) global QUOTES_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 62 };
+    pub(crate) global QUOTES_ADDRESS_SEQUENCE: Sequence = Sequence { index: 35, length: 29 };
+    pub(crate) global MALICIOUS_QUOTES_ADDRESS_SEQUENCE: Sequence =
+        Sequence { index: 8, length: 24 };
 }
 
 pub(crate) mod PartialHash {

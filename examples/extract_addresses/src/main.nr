@@ -1,8 +1,8 @@
-use dep::zkemail::{
-    KEY_LIMBS_2048, dkim::RSAPubkey, headers::email_address::get_email_address, Sequence,
-    MAX_EMAIL_ADDRESS_LENGTH,
+use std::{collections::bounded_vec::BoundedVec, hash::pedersen_hash};
+use zkemail::{
+    dkim::RSAPubkey, headers::email_address::get_email_address, KEY_LIMBS_2048,
+    MAX_EMAIL_ADDRESS_LENGTH, Sequence,
 };
-use dep::std::{collections::bounded_vec::BoundedVec, hash::pedersen_hash};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 

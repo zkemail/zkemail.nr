@@ -4,3 +4,4 @@ dist
 .tsbuildinfo
 zk-email-verify
 !*/email-*.eml
+.DS_Store

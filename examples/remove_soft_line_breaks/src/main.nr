@@ -1,8 +1,8 @@
-use zkemail::{
-    KEY_LIMBS_2048, dkim::RSAPubkey, headers::body_hash::get_body_hash, Sequence,
-    remove_soft_line_breaks::remove_soft_line_breaks,
-};
 use std::hash::{pedersen_hash, sha256_var};
+use zkemail::{
+    dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048,
+    remove_soft_line_breaks::remove_soft_line_breaks, Sequence,
+};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
