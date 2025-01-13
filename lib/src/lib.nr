@@ -55,9 +55,6 @@ let KEY_LIMBS: u32>(
     pubkey: RSAPubkey<KEY_LIMBS_2048>,
     signature: [Field; KEY_LIMBS_2048],
 ) {
-    // check the body and header lengths are within bounds
-    assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
-
     // ~ 86,553 constraints with 2048-bit RSA & 1024 bit max header length
     // verify the dkim signature over the header
     pubkey.verify_dkim_signature(header, signature);
