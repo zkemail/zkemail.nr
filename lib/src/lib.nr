@@ -1,5 +1,5 @@
-use std::hash::pedersen_hash;
 use crate::dkim::RSAPubkey;
+use std::hash::pedersen_hash;
 
 pub mod dkim;
 pub mod headers;
