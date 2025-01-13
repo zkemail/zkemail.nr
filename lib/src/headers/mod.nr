@@ -56,7 +56,7 @@ pub fn constrain_header_field<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_L
     );
     // check the header field is uninterrupted
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
-    for i in (HEADER_FIELD_NAME_LENGTH + 1)..MAX_HEADER_FIELD_LENGTH {
+    for i in 0..MAX_HEADER_FIELD_LENGTH {
         // is it safe enough to cut this constraint cost in half by not checking lf? i think so
         let index = start_index + i;
         if (index < header_field_sequence.index + header_field_sequence.length) {
