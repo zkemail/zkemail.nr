@@ -1,8 +1,8 @@
 use dep::zkemail::{
     KEY_LIMBS_2048, dkim::RSAPubkey, headers::body_hash::get_body_hash,
-    standard_outputs, Sequence, masking::mask_text
+    Sequence, masking::mask_text
 };
-use dep::std::{collections::bounded_vec::BoundedVec, hash::sha256_var};
+use dep::std::{collections::bounded_vec::BoundedVec, hash::{pedersen_hash, sha256_var}};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
@@ -55,6 +55,7 @@ fn main(
     let masked_body = mask_text(body, body_mask);
 
     // hash the pubkey and signature for the standard outputs
-    let standard_out = standard_outputs(pubkey.modulus, signature);
+    let email_nullifier = pedersen_hash(signature);
+    let standard_out = [pubkey.hash(), email_nullifier];
     (standard_out, masked_header, masked_body)
 }
