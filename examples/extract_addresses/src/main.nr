@@ -1,15 +1,10 @@
-use dep::std::{collections::bounded_vec::BoundedVec, hash::sha256_var};
-use dep::zkemail::{
-    dkim::RSAPubkey,
-    headers::{body_hash::get_body_hash, email_address::get_email_address},
-    KEY_LIMBS_2048,
-    MAX_EMAIL_ADDRESS_LENGTH,
-    Sequence,
-    standard_outputs,
+use std::{collections::bounded_vec::BoundedVec, hash::pedersen_hash};
+use zkemail::{
+    dkim::RSAPubkey, headers::email_address::get_email_address, KEY_LIMBS_2048,
+    MAX_EMAIL_ADDRESS_LENGTH, Sequence,
 };
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
-global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
 
 /**
  * Verify an arbitrary email signed by a 2048-bit RSA DKIM signature and extract sender and recipient addresses
@@ -49,6 +44,7 @@ fn main(
     let to_address = get_email_address(header, to_header_sequence, to_address_sequence, to);
 
     // hash the pubkey and signature for the standard outputs
-    let standard_out = standard_outputs(pubkey.modulus, signature);
+    let email_nullifier = pedersen_hash(signature);
+    let standard_out = [pubkey.hash(), email_nullifier];
     (standard_out, from_address, to_address)
 }

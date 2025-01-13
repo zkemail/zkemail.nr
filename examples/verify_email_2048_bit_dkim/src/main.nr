@@ -1,7 +1,5 @@
-use dep::std::{collections::bounded_vec::BoundedVec, hash::sha256_var};
-use dep::zkemail::{
-    dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048, Sequence, standard_outputs,
-};
+use std::{collections::bounded_vec::BoundedVec, hash::{pedersen_hash, sha256_var}};
+use zkemail::{dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048, Sequence};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
@@ -52,5 +50,6 @@ fn main(
 
     // ~ 10,255 constraints
     // hash the pubkey and signature for the standard outputs
-    standard_outputs(pubkey.modulus, signature)
+    let email_nullifier = pedersen_hash(signature);
+    [pubkey.hash(), email_nullifier]
 }

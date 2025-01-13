@@ -1,6 +1,7 @@
-use dep::zkemail::{
+use std::hash::pedersen_hash;
+use zkemail::{
     dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048,
-    partial_hash::partial_sha256_var_end, Sequence, standard_outputs,
+    partial_hash::partial_sha256_var_end, Sequence,
 };
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
@@ -61,5 +62,6 @@ fn main(
     );
 
     // hash the pubkey and signature for the standard outputs
-    standard_outputs(pubkey.modulus, signature)
+    let email_nullifier = pedersen_hash(signature);
+    [pubkey.hash(), email_nullifier]
 }

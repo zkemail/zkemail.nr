@@ -17,7 +17,6 @@ The library exports the following functions:
 - `headers::constrain_header_field` - constrain an index/ length in the header to be the correct name, full, and uninterrupted
 - `partial_hash::partial_sha256_var_end` - finish a precomputed sha256 hash over the body
 - `masking::mask_text` - apply a byte mask to the header or body to selectively reveal parts of the entire email
-- `standard_outputs` - returns the hash of the DKIM pubkey and a nullifier for the email (`hash(signature)`)
 
 Additionally, the `@zk-email/zkemail-nr` JS library exports an ergonomic API for easily deriving circuit inputs needed to utilize the Noir library.
 
@@ -28,9 +27,9 @@ A basic email verifier will often look like this:
 ```rust
 use dep::zkemail::{
     KEY_LIMBS_1024, dkim::RSAPubkey, get_body_hash_by_index,     
-    base64::body_hash_base64_decode, standard_outputs
+    base64::body_hash_base64_decode
 };
-use dep::std::hash::sha256_var;
+use dep::std::hash::{sha256_var, pedersen_hash};
 
 // Somewhere in your function
 ...
