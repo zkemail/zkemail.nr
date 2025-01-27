@@ -66,7 +66,7 @@ fn verify_msg_block<let N: u32>(
     msg_byte_ptr
 }
 
-global BLOCK_SIZE = 64;
+global BLOCK_SIZE: u32 = 64;
 
 // https://github.com/noir-lang/noir/blob/76eec710ff73e5e45fdddcd41ae2cd74e879cfa5/noir_stdlib/src/hash/sha256.nr#L86-L116
 /**
