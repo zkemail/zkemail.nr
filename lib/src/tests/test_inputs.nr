@@ -162,24 +162,24 @@ pub(crate) mod EmailLarge {
 
     // mutate inputs
 
-    pub unconstrained fn tampered_header() -> BoundedVec<u8, EMAIL_LARGE_MAX_HEADER_LENGTH> {
+    pub fn tampered_header() -> BoundedVec<u8, EMAIL_LARGE_MAX_HEADER_LENGTH> {
         let mut header = HEADER;
         header.set(140, header.get_unchecked(140) + 1);
         header
     }
 
-    pub unconstrained fn tampered_body() -> BoundedVec<u8, EMAIL_LARGE_MAX_BODY_LENGTH> {
+    pub fn tampered_body() -> BoundedVec<u8, EMAIL_LARGE_MAX_BODY_LENGTH> {
         let mut body = BODY;
         body.set(140, body.get_unchecked(140) + 1);
         body
     }
 
-    pub unconstrained fn body_hash_outside_sequence() -> u32 {
+    pub fn body_hash_outside_sequence() -> u32 {
         let dkim_sequence_start = DKIM_HEADER_SEQUENCE.index;
         dkim_sequence_start - 40
     }
 
-    pub unconstrained fn tampered_dkim_field() -> (BoundedVec<u8, 338>, u32) {
+    pub fn tampered_dkim_field() -> (BoundedVec<u8, 338>, u32) {
         let header: BoundedVec<u8, 338> = BoundedVec::from_array([
             100, 107, 105, 109, 45, 115, 105, 103, 110, 97, 116, 117, 114, 101, 58, 32, 118, 61, 49,
             59, 32, 97, 61, 114, 115, 97, 45, 115, 104, 97, 50, 53, 54, 59, 32, 100, 61, 101, 120,
