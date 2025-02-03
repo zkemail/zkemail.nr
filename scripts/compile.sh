@@ -1,5 +1,8 @@
 #!/bin/bash
-cd ..
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+
+cd "$SCRIPT_DIR/.."
+
 compile_example() {
     project=$1
     echo "Compiling $project"

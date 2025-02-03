@@ -1,12 +1,9 @@
 use crate::dkim::RSAPubkey;
-use std::hash::pedersen_hash;
-
 pub mod dkim;
 pub mod headers;
 pub mod masking;
 pub mod partial_hash;
 pub mod remove_soft_line_breaks;
-// mod macro;
 mod tests;
 
 global RSA_EXPONENT: u32 = 65537;

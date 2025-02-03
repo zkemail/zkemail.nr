@@ -1,4 +1,5 @@
 #!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
 get_circuit_size() {
     project=$1
@@ -19,7 +20,7 @@ get_circuit_size() {
     popd > /dev/null
 }
 
-cd ../examples
+cd $SCRIPT_DIR/../examples
 # Loop over every child folder in the examples directory
 for folder in *; do
     if [ -d "$folder" ]; then
