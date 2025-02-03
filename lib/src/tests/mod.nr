@@ -133,7 +133,7 @@ mod header_field_access {
 
     use crate::{headers::body_hash::get_body_hash, Sequence, tests::test_inputs::EmailLarge};
 
-    #[test(should_fail_with = "No 'bh=' prefix found at asserted bh index")]
+    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
     fn test_bad_body_hash_off_one_minus() {
         // attempt to get body hash with one off index
         let _ = get_body_hash(
@@ -143,7 +143,7 @@ mod header_field_access {
         );
     }
 
-    #[test(should_fail_with = "No 'bh=' prefix found at asserted bh index")]
+    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
     fn test_bad_body_hash_off_one_plus() {
         // attempt to get body hash with one off index
         let _ = get_body_hash(
@@ -178,7 +178,19 @@ mod header_field_access {
         let _ = get_body_hash(dkim_field, malicious_sequence, malicious_body_hash_index);
     }
 
-    #[test(should_fail_with = "No 'bh=' prefix found at asserted bh index")]
+    #[test]
+    fn test_body_hash_at_start() {
+        let mut dkim_field: [u8; 203] = comptime {
+            "dkim-signature:bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; v=1; a=rsa-sha256; c=relaxed/relaxed; d=icloud.com; s=1a1hai; t=1712141644; h=from:Content-Type:Mime-Version:Subject:Message-Id:Date:to; b="
+                .as_bytes()
+        };
+        let header: BoundedVec<u8, 203> = BoundedVec { storage: dkim_field, len: 203 };
+        let mut dkim_field_sequence = Sequence { index: 0, length: 203 };
+        let body_hash_index = 18;
+        let _ = get_body_hash(header, dkim_field_sequence, body_hash_index);
+    }
+
+    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
     fn test_malicious_body_hash_index() {
         // tests against "dkim-signature: v=1; a=rsa-sha256; d=example.com; s=selector; c=relaxed/relaxed; q=dns/txt; t=1683849600; x=1684454400; h=from:to:subject:date; z=From:bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=@domain.com|To:recipient@example.net|Subject:Hello|Date:Thu, 11 May 2023 15:00:00 -0700; bh=2jUSOH9NhtVGCaWpZT2ncBgaamXkef9OgICHkqfsmKY=; b="
         let (header, body_hash_index) = EmailLarge::tampered_dkim_field();

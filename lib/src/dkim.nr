@@ -14,7 +14,6 @@ impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
         let pubkey = Self { modulus, redc };
         pubkey
     }
-
 }
 
 impl RSAPubkey<KEY_LIMBS_1024> {
