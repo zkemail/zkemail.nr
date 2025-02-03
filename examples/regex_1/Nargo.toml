@@ -1,5 +1,5 @@
 [package]
-name = "remove_soft_line_breaks"
+name = "regex_1"
 type = "bin"
 authors = ["Mach 34"]
 compiler_version = ">=1.0.0"

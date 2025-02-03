@@ -4,7 +4,8 @@ mod test_success {
 
     use crate::{
         headers::{body_hash::get_body_hash, email_address::get_email_address},
-        MAX_EMAIL_ADDRESS_LENGTH, partial_hash::partial_sha256_var_end,
+        MAX_EMAIL_ADDRESS_LENGTH,
+        partial_hash::partial_sha256_var_end,
         tests::test_inputs::EmailLarge,
     };
     use std::hash::sha256_var;
@@ -116,6 +117,16 @@ mod test_tampered_hash {
             "SHA256 hash should not match tampered body hash",
         );
     }
+
+    #[test(should_fail_with = "all to assert_max_bit_size")]
+    fn test_dkim_signature_unnormalized() {
+        let mut sig = EmailLarge::SIGNATURE;
+        let pubkey = EmailLarge::PUBKEY;
+        let delta = 1;
+        sig[0] += delta * 0x1000000000000000000000000000000;
+        sig[1] -= delta;
+        pubkey.verify_dkim_signature(EmailLarge::HEADER, sig);
+    }
 }
 
 mod header_field_access {
@@ -165,6 +176,14 @@ mod header_field_access {
         // copy the body hash to the beginning of the
         // attempt to get body hash
         let _ = get_body_hash(dkim_field, malicious_sequence, malicious_body_hash_index);
+    }
+
+    #[test(should_fail_with = "No 'bh=' prefix found at asserted bh index")]
+    fn test_malicious_body_hash_index() {
+        // tests against "dkim-signature: v=1; a=rsa-sha256; d=example.com; s=selector; c=relaxed/relaxed; q=dns/txt; t=1683849600; x=1684454400; h=from:to:subject:date; z=From:bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=@domain.com|To:recipient@example.net|Subject:Hello|Date:Thu, 11 May 2023 15:00:00 -0700; bh=2jUSOH9NhtVGCaWpZT2ncBgaamXkef9OgICHkqfsmKY=; b="
+        let (header, body_hash_index) = EmailLarge::tampered_dkim_field();
+        let sequence: Sequence = Sequence { index: 0, length: header.len() };
+        let _ = get_body_hash(header, sequence, body_hash_index);
     }
 
     #[test(should_fail_with = "Header field must end with CRLF")]

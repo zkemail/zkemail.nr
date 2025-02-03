@@ -1,8 +1,8 @@
-use dep::zkemail::{
-    KEY_LIMBS_2048, dkim::RSAPubkey, headers::body_hash::get_body_hash,
-    standard_outputs, Sequence, masking::mask_text
+use std::{collections::bounded_vec::BoundedVec, hash::{pedersen_hash, sha256_var}};
+use zkemail::{
+    dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048, masking::mask_text,
+    Sequence,
 };
-use dep::std::{collections::bounded_vec::BoundedVec, hash::sha256_var};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
@@ -30,7 +30,7 @@ fn main(
     body_hash_index: u32,
     dkim_header_sequence: Sequence,
     header_mask: [bool; MAX_EMAIL_HEADER_LENGTH],
-    body_mask: [bool; MAX_EMAIL_BODY_LENGTH]
+    body_mask: [bool; MAX_EMAIL_BODY_LENGTH],
 ) -> pub ([Field; 2], [u8; MAX_EMAIL_HEADER_LENGTH], [u8; MAX_EMAIL_BODY_LENGTH]) {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
@@ -47,7 +47,8 @@ fn main(
 
     // compare the body hashes
     assert(
-        signed_body_hash == computed_body_hash, "SHA256 hash computed over body does not match body hash found in DKIM-signed header"
+        signed_body_hash == computed_body_hash,
+        "SHA256 hash computed over body does not match body hash found in DKIM-signed header",
     );
 
     // mask the header and body
@@ -55,6 +56,7 @@ fn main(
     let masked_body = mask_text(body, body_mask);
 
     // hash the pubkey and signature for the standard outputs
-    let standard_out = standard_outputs(pubkey.modulus, signature);
+    let email_nullifier = pedersen_hash(signature);
+    let standard_out = [pubkey.hash(), email_nullifier];
     (standard_out, masked_header, masked_body)
 }

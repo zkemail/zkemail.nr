@@ -1,8 +1,5 @@
-use dep::zkemail::{
-    KEY_LIMBS_2048, dkim::RSAPubkey, headers::body_hash::get_body_hash,
-    standard_outputs, Sequence
-};
-use dep::std::{collections::bounded_vec::BoundedVec, hash::sha256_var};
+use std::{collections::bounded_vec::BoundedVec, hash::{pedersen_hash, sha256_var}};
+use zkemail::{dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048, Sequence};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
@@ -27,7 +24,7 @@ fn main(
     pubkey: RSAPubkey<KEY_LIMBS_2048>,
     signature: [Field; KEY_LIMBS_2048],
     body_hash_index: u32,
-    dkim_header_sequence: Sequence
+    dkim_header_sequence: Sequence,
 ) -> pub [Field; 2] {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
@@ -47,10 +44,12 @@ fn main(
 
     // compare the body hashes
     assert(
-        signed_body_hash == computed_body_hash, "SHA256 hash computed over body does not match body hash found in DKIM-signed header"
+        signed_body_hash == computed_body_hash,
+        "SHA256 hash computed over body does not match body hash found in DKIM-signed header",
     );
 
     // ~ 10,255 constraints
     // hash the pubkey and signature for the standard outputs
-    standard_outputs(pubkey.modulus, signature)
+    let email_nullifier = pedersen_hash(signature);
+    [pubkey.hash(), email_nullifier]
 }

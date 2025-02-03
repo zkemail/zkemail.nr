@@ -1,6 +1,7 @@
-use dep::zkemail::{
-    KEY_LIMBS_2048, dkim::RSAPubkey, headers::body_hash::get_body_hash,
-    partial_hash::partial_sha256_var_end, standard_outputs, Sequence
+use std::hash::pedersen_hash;
+use zkemail::{
+    dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048,
+    partial_hash::partial_sha256_var_end, Sequence,
 };
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
@@ -31,12 +32,15 @@ fn main(
     body_hash_index: u32,
     dkim_header_sequence: Sequence,
     partial_body_hash: [u32; 8],
-    partial_body_real_length: u64
+    partial_body_real_length: u64,
 ) -> pub [Field; 2] {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH, "Email header length exceeds maximum length");
-    assert(body.len() <= MAX_PARTIAL_EMAIL_BODY_LENGTH, "Partial email body length exceeds maximum length");
-    
+    assert(
+        body.len() <= MAX_PARTIAL_EMAIL_BODY_LENGTH,
+        "Partial email body length exceeds maximum length",
+    );
+
     // verify the dkim signature over the header
     pubkey.verify_dkim_signature(header, signature);
 
@@ -44,13 +48,20 @@ fn main(
     let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
 
     // finish the partial hash
-    let computed_body_hash = partial_sha256_var_end(partial_body_hash, body.storage(), body.len() as u64, partial_body_real_length);    
+    let computed_body_hash = partial_sha256_var_end(
+        partial_body_hash,
+        body.storage(),
+        body.len() as u64,
+        partial_body_real_length,
+    );
 
     // check the body hashes match
     assert(
-        signed_body_hash == computed_body_hash, "Sha256 hash computed over body does not match DKIM-signed header"
+        signed_body_hash == computed_body_hash,
+        "Sha256 hash computed over body does not match DKIM-signed header",
     );
 
     // hash the pubkey and signature for the standard outputs
-    standard_outputs(pubkey.modulus, signature)
+    let email_nullifier = pedersen_hash(signature);
+    [pubkey.hash(), email_nullifier]
 }

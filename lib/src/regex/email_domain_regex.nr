@@ -1,8 +1,8 @@
 global table: [Field; 1280] = comptime { make_lookup_table() };
-pub fn regex_match<let N: u32>(input: [u8; N]) -> Vec<BoundedVec<Field, N>> {
+pub fn regex_match<let N: u32, let M: u32>(input: [u8; N]) -> BoundedVec<BoundedVec<Field, N + 1>, M> {
     // regex: [A-Za-z0-9!#$%&'*+=?\-\^_`{|}~./]+@[A-Za-z0-9.\-@]+
-    let mut substrings: Vec<BoundedVec<Field, N>> = Vec::new();
-
+    // let mut substrings: Vec<BoundedVec<Field, N + 1>> = Vec::new();
+    let mut substrings: BoundedVec<BoundedVec<Field, N + 1>, M> = BoundedVec::new();
     // "Previous" state
     let mut s: Field = 0;
     s = table[255];
@@ -10,15 +10,18 @@ pub fn regex_match<let N: u32>(input: [u8; N]) -> Vec<BoundedVec<Field, N>> {
     let mut s_next: Field = 0;
 
     let mut consecutive_substr = 0;
-    let mut current_substring = BoundedVec::new();
-
+    // let mut current_substring: BoundedVec<Field, N + 1> = BoundedVec::new();
+    let mut current_substring_arr: [Field; N + 1] = [0; N + 1];
+    let mut assign_index = 0;
+    let mut substr_index = 0;
     for i in 0..input.len() {
         let temp = input[i] as Field;
         let mut reset = false;
         s_next = table[s * 256 + temp];
+        let s_next_potentially = table[temp];
         if s_next == 0 {
           // Check if there is any transition that could be done from a "restart"
-          s_next = table[temp];
+          s_next = s_next_potentially;
           // whether the next state changes or not, we mark this as a reset.
           reset = true;
           s = 0;
@@ -26,35 +29,40 @@ pub fn regex_match<let N: u32>(input: [u8; N]) -> Vec<BoundedVec<Field, N>> {
 
         // If a substring was in the making, but the state was reset
         // we disregard previous progress because apparently it is invalid
-        if (reset & (consecutive_substr == 1)) {
-            current_substring = BoundedVec::new();
-            consecutive_substr = 0;
-        }
+        // if (reset & (consecutive_substr == 1)) {
+        //     current_substring = BoundedVec::new();
+        //     consecutive_substr = 0;
+        // }
         // Fill up substrings
+        let mut substr_index_int = M;
+        let mut assign_index_int = N;
         if ((s == 2) & (s_next == 3) | (s == 3) & (s_next == 3)) {
-            if (consecutive_substr == 0) {
-              current_substring.push(temp);
-              consecutive_substr = 1;
-            } else if (consecutive_substr == 1) {
-              current_substring.push(temp);
-            }   
+            consecutive_substr = 1;
+            assign_index_int = assign_index;
+            assign_index += 1;
         } else if ((consecutive_substr == 1) & (s_next == 0)) {
-            current_substring = BoundedVec::new();
+            assign_index = 0;
             consecutive_substr = 0;
         } else if (consecutive_substr == 1) {
             // The substring is done so "save" it
-            substrings.push(current_substring);
+            substr_index_int = substr_index;
             // reset the substring holder for next use
-            current_substring = BoundedVec::new();
+            current_substring_arr = [0; N + 1];
+            consecutive_substr = 0;
+            assign_index = 0;
             consecutive_substr = 0;
         }
+        substrings.storage[substr_index_int] = BoundedVec { storage: current_substring_arr, len: assign_index_int };
+        current_substring_arr[assign_index_int] = temp;
         s = s_next;
     }
     assert((s == 3) | (s == 4), f"no match: {s}");
     // Add pending substring that hasn't been added
-    if consecutive_substr == 1 {
-        substrings.push(current_substring);
-    }
+    // if consecutive_substr == 1 {
+    //     substrings.push(current_substring);
+    // }
+    // substrings
+    // BoundedVec { storage: current_substring_arr, len: assign_index }
     substrings
 }
         
