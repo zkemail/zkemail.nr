@@ -1,4 +1,4 @@
-use crate::dkim::RSAPubkey;
+use std::hash::pedersen_hash;
 pub mod dkim;
 pub mod headers;
 pub mod masking;
@@ -37,22 +37,37 @@ global EMAIL_ADDRESS_CHAR_TABLE: [u8; 123] = [
 ];
 
 /**
- * Default email verification function
- * @dev use #[zkemail] attribute macro to apply other functionality
+ * Create a nullifier for a signature with a blinding factor
  *
- * @param MAX_EMAIL_HEADER_LENGTH - The maximum length of the email header
- * @param KEY_LIMBS - The number of limbs in the RSA pubkey
- * @param header - The email header, 0-padded at end to the MAX_EMAIL_HEADER_LENGTH
- * @param pubkey - The DKIM RSA Public Key modulus and reduction parameter
- * @param signature - The DKIM RSA Signature
+ * @param signature - The signature to nullify
+ * @param nonce - The nonce to use in the nullifier as a blinding factor
+ * @return - The blinded nullifier for the signature
  */
-pub fn verify_email<let MAX_EMAIL_HEADER_LENGTH: u32, let MAX_EMAIL_BODY_LENGTH: u32, // sometimes unused but needed for macro
-let KEY_LIMBS: u32>(
-    header: BoundedVec<u8, MAX_EMAIL_HEADER_LENGTH>,
-    pubkey: RSAPubkey<KEY_LIMBS_2048>,
-    signature: [Field; KEY_LIMBS_2048],
-) {
-    // ~ 86,553 constraints with 2048-bit RSA & 1024 bit max header length
-    // verify the dkim signature over the header
-    pubkey.verify_dkim_signature(header, signature);
+pub fn blinded_nullifier<let KEY_LIMBS: u32>(signature: [Field; KEY_LIMBS], nonce: Field) -> Field {
+    let preimage = unsafe { __blinded_nullifier(signature, nonce) };
+    for i in 0..KEY_LIMBS {
+        assert(preimage[i] == signature[i], "Preimage does not contain signature");
+    }
+    assert(preimage[KEY_LIMBS] == nonce, "Preimage does not contain nonce");
+    pedersen_hash(preimage)
+}
+
+/**
+ * Builds the nullifier preimage with a nonce
+ * @notice the nonce should be governed at the app level - i.e. an aztec note can pass this in
+ * 
+ * @param signature - The signature to nullify
+ * @param nonce - The nonce to use in the nullifier as a blinding factor
+ */
+unconstrained fn __blinded_nullifier<let KEY_LIMBS: u32>(
+    signature: [Field; KEY_LIMBS],
+    nonce: Field,
+) -> [Field; KEY_LIMBS + 1] {
+    let mut nullifier_preimage = [0; KEY_LIMBS + 1];
+    for i in 0..KEY_LIMBS {
+        nullifier_preimage[i] = signature[i];
+    }
+    nullifier_preimage[KEY_LIMBS] = nonce;
+
+    nullifier_preimage
 }
