@@ -4,6 +4,16 @@ use crate::{
 };
 use base64::BASE64_DECODER;
 
+// ON DKIM-SIGNATURE PARSING:
+// In the current version, DKIM-SIGNATURE tags are mostly ignored:
+// c= is ignored, meaning we assume the canonicalization is relaxed. This can cause denial of service issues
+// v= is ignored, meaning we do not check for a valid version of dkim signing
+// l= is ignored, meaning we otherwise constrain the body length to be safe
+// x= is ignored, meaning we accept signatures without expiration
+// sdid= is ignored, meaning that we don't explicitly bind dkim keys to exact signing domains
+// See line 42 of this file for parsing bh=;
+// You will need to implement your own parsing for the tags' expected values
+
 /**
  * Constrained access to the body hash in the header
  * 
@@ -30,14 +40,7 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
         body_hash_index + BODY_HASH_BASE64_LENGTH < dkim_header_field_sequence.end_index() + 1;
     assert(start_range & end_range, "Body hash index accessed outside of DKIM header field");
 
-    // check that bh is preceded either by : or ;
-    // let delimeter_options: [u8; 2] = comptime { [":".as_bytes()[0], ";".as_bytes()[0]] };
-    // let delimeter_byte = header.get_unchecked(body_hash_index - 5);
-    // let equals_colon = delimeter_byte == delimeter_options[0];
-    // let equals_semicolon = delimeter_byte == delimeter_options[1];
-    // assert(equals_colon | equals_semicolon, "No ':' or ';' delimeter found before body hash");
-
-    // check case when first
+    // check bh prefix
     let bh_prefix_first_no_space: [u8; 5] = comptime { "e:bh=".as_bytes() };
     let bh_prefix_space: [u8; 5] = comptime { ": bh=".as_bytes() };
     let bh_prefix_subsequent: [u8; 5] = comptime { "; bh=".as_bytes() };
