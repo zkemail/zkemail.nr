@@ -25,25 +25,44 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
         header_field_name,
     );
     // constrain access to the body hash
-    assert(
-        body_hash_index > dkim_header_field_sequence.index
-            & body_hash_index + BODY_HASH_BASE64_LENGTH < dkim_header_field_sequence.end_index() + 1
-            ,
-            "Body hash index accessed outside of DKIM header field",
-        );
-        let bh_prefix: [u8; 5] = comptime { "; bh=".as_bytes() };
-        for i in 0..5 {
-            let character = header.get_unchecked(body_hash_index - 5 + i);
-            assert(character == bh_prefix[i], "No 'bh=' prefix found at asserted bh index");
-        }
-        let bh_suffix: u8 = comptime { ";".as_bytes()[0] };
-        assert(
-            header.get_unchecked(body_hash_index + BODY_HASH_BASE64_LENGTH) == bh_suffix,
-            "No ';' suffix found at asserted bh index",
-        );
-        // get the body hash
-        get_body_hash_unsafe(header, body_hash_index)
+    let start_range = body_hash_index > dkim_header_field_sequence.index;
+    let end_range =
+        body_hash_index + BODY_HASH_BASE64_LENGTH < dkim_header_field_sequence.end_index() + 1;
+    assert(start_range & end_range, "Body hash index accessed outside of DKIM header field");
+
+    // check that bh is preceded either by : or ;
+    // let delimeter_options: [u8; 2] = comptime { [":".as_bytes()[0], ";".as_bytes()[0]] };
+    // let delimeter_byte = header.get_unchecked(body_hash_index - 5);
+    // let equals_colon = delimeter_byte == delimeter_options[0];
+    // let equals_semicolon = delimeter_byte == delimeter_options[1];
+    // assert(equals_colon | equals_semicolon, "No ':' or ';' delimeter found before body hash");
+
+    // check case when first
+    let bh_prefix_first_no_space: [u8; 5] = comptime { "e:bh=".as_bytes() };
+    let bh_prefix_space: [u8; 5] = comptime { ": bh=".as_bytes() };
+    let bh_prefix_subsequent: [u8; 5] = comptime { "; bh=".as_bytes() };
+    let mut found_first = true;
+    let mut found_subsequent = true;
+    for i in 0..5 {
+        let character = header.get_unchecked(body_hash_index - 5 + i);
+        let match_first_no_space = character == bh_prefix_first_no_space[i];
+        let match_first_space = character == bh_prefix_space[i];
+        let match_first = match_first_no_space | match_first_space;
+        found_first = found_first & match_first;
+        let match_subsequent = character == bh_prefix_subsequent[i];
+        found_subsequent = found_subsequent & match_subsequent;
     }
+    assert(found_first | found_subsequent, "No ':bh=' or '; bh=' prefix found before body hash");
+
+    // check that bh is followed by ;
+    let bh_suffix: u8 = comptime { ";".as_bytes()[0] };
+    assert(
+        header.get_unchecked(body_hash_index + BODY_HASH_BASE64_LENGTH) == bh_suffix,
+        "No ';' suffix found at asserted bh index",
+    );
+    // get the body hash
+    get_body_hash_unsafe(header, body_hash_index)
+}
 
 /**
  * Get the body hash from the header without validating the access index. Does not validate body
