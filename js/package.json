@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@aztec/bb.js": "0.66.0",
-    "@mach-34/noir-bignum-paramgen": "^1.1.0",
+    "@mach-34/noir-bignum-paramgen": "^1.1.2",
     "@noir-lang/noir_js": "1.0.0-beta.1",
     "@noir-lang/noirc_abi": "^1.0.0-beta.1",
     "@zk-email/helpers": "^6.3.2"

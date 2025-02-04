@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { ZKEmailProver } from "../src/prover";
 import { generateEmailVerifierInputs } from "../src/index";
@@ -21,6 +22,7 @@ const inputParams = {
   maxHeadersLength: 512,
   maxBodyLength: 1024,
 };
+const threads = os.cpus().length;
 
 describe("ZKEmail.nr E2E Tests", () => {
   describe("2048-bit circuit", () => {
@@ -28,7 +30,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraPlonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuit2048, "plonk");
+        prover = new ZKEmailProver(circuit2048, "plonk", threads);
       });
       afterAll(async () => {
         prover.destroy();
@@ -55,7 +57,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraHonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuit2048, "honk");
+        prover = new ZKEmailProver(circuit2048, "honk", threads);
       });
       afterAll(async () => {
         prover.destroy();
@@ -85,7 +87,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraPlonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuitPartialHash, "plonk");
+        prover = new ZKEmailProver(circuitPartialHash, "plonk", threads);
       });
       afterAll(async () => {
         prover.destroy();
@@ -104,7 +106,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraHonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuitPartialHash, "honk");
+        prover = new ZKEmailProver(circuitPartialHash, "honk", threads);
       });
       afterAll(async () => {
         prover.destroy();
@@ -126,7 +128,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraPlonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuitEmailMask, "plonk");
+        prover = new ZKEmailProver(circuitEmailMask, "plonk", threads);
       });
       afterAll(async () => {
         prover.destroy();
@@ -153,7 +155,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraHonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuitEmailMask, "honk");
+        prover = new ZKEmailProver(circuitEmailMask, "honk", threads);
       });
       afterAll(async () => {
         prover.destroy();
@@ -183,7 +185,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraPlonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuitExtractAddresses, "plonk");
+        prover = new ZKEmailProver(circuitExtractAddresses, "plonk", threads);
       });
       afterAll(async () => {
         prover.destroy();
@@ -202,7 +204,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraHonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuitExtractAddresses, "honk");
+        prover = new ZKEmailProver(circuitExtractAddresses, "honk", threads);
       });
       afterAll(async () => {
         prover.destroy();
@@ -224,7 +226,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraPlonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuitRemoveSoftLineBreak, "plonk");
+        prover = new ZKEmailProver(circuitRemoveSoftLineBreak, "plonk", threads);
       });
       afterAll(async () => {
         prover.destroy();
@@ -242,7 +244,7 @@ describe("ZKEmail.nr E2E Tests", () => {
     describe("UltraHonk", () => {
       beforeAll(async () => {
         //@ts-ignore
-        prover = new ZKEmailProver(circuitRemoveSoftLineBreak, "honk");
+        prover = new ZKEmailProver(circuitRemoveSoftLineBreak, "honk", threads);
       });
       afterAll(async () => {
         prover.destroy();

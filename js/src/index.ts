@@ -105,7 +105,7 @@ export async function generateEmailVerifierInputs(
   rawEmail: Buffer | string,
   params: InputGenerationArgs = {}
 ) {
-  const dkimResult = await verifyDKIMSignature(rawEmail);
+  const dkimResult = await verifyDKIMSignature(rawEmail, undefined, undefined, true);
 
   return generateEmailVerifierInputsFromDKIMResult(dkimResult, params);
 }
@@ -120,7 +120,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
   dkimResult: DKIMVerificationResult,
   params: InputGenerationArgs = {}
 ): CircuitInput {
-  const { headers, body, bodyHash, publicKey, signature } = dkimResult;
+  const { headers, body, bodyHash, publicKey, signature, modulusLength } = dkimResult;
 
   // SHA add padding
   const [messagePadded] = sha256Pad(
@@ -135,11 +135,11 @@ export function generateEmailVerifierInputsFromDKIMResult(
       len: headers.length.toString(),
     },
     pubkey: {
-      modulus: NoirBignum.bnToLimbStrArray(publicKey),
-      redc: NoirBignum.bnToRedcLimbStrArray(publicKey),
+      modulus: NoirBignum.bnToLimbStrArray(publicKey, modulusLength),
+      redc: NoirBignum.bnToRedcLimbStrArray(publicKey, modulusLength),
     },
     // modified from original: use noir bignum to format
-    signature: NoirBignum.bnToLimbStrArray(signature),
+    signature: NoirBignum.bnToLimbStrArray(signature, modulusLength),
     dkim_header_sequence: getHeaderSequence(headers, "dkim-signature"),
   };
 
