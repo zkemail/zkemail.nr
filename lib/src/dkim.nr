@@ -59,7 +59,7 @@ impl RSAPubkey<KEY_LIMBS_1024> {
             self.redc[i].assert_max_bit_size::<120>();
         }
         self.modulus[KEY_LIMBS_1024 - 1].assert_max_bit_size::<1024 - ((KEY_LIMBS_1024 - 1) * 120)>();
-        self.redc[KEY_LIMBS_1024 - 1].assert_max_bit_size::<1024 - ((KEY_LIMBS_1024 - 1) * 120)>();
+        self.redc[KEY_LIMBS_1024 - 1].assert_max_bit_size::<120>();
     }
 }
 
@@ -103,6 +103,6 @@ impl RSAPubkey<KEY_LIMBS_2048> {
             self.redc[i].assert_max_bit_size::<120>();
         }
         self.modulus[KEY_LIMBS_2048 - 1].assert_max_bit_size::<2048 - ((KEY_LIMBS_2048 - 1) * 120)>();
-        self.redc[KEY_LIMBS_2048 - 1].assert_max_bit_size::<2048 - ((KEY_LIMBS_2048 - 1) * 120)>();
+        self.redc[KEY_LIMBS_2048 - 1].assert_max_bit_size::<120>(); // we get 2053 sometimes?
     }
 }

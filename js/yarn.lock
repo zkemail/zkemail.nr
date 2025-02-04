@@ -1580,7 +1580,7 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@mach-34/noir-bignum-paramgen@^1.1.0":
+"@mach-34/noir-bignum-paramgen@^1.1.2":
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/@mach-34/noir-bignum-paramgen/-/noir-bignum-paramgen-1.1.2.tgz#ba97b7afe43fc28b66abdd67c4e6d68c2bae335c"
   integrity sha512-9U/PETHR4Yf8/ezyQgXE5Qz+7mo1wlTv2JuxW90uwXEV3pFlfl5c/Sl95vaHP+ldTllZkUdTXjDnGiirbiUn3w==

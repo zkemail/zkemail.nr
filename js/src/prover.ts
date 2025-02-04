@@ -1,6 +1,7 @@
-import { UltraPlonkBackend, UltraHonkBackend, ProofData } from "@aztec/bb.js";
+import { UltraPlonkBackend, UltraHonkBackend } from "@aztec/bb.js";
+import { ProofData } from "@aztec/bb.js/dest/node-cjs/proof";
 import { Noir, InputMap, CompiledCircuit } from "@noir-lang/noir_js";
-import { InputValue } from "@noir-lang/noirc_abi";
+import { InputValue, } from "@noir-lang/noirc_abi";
 
 type ProvingBackend = "honk" | "plonk" | "all";
 
@@ -15,14 +16,16 @@ export class ZKEmailProver {
     /* The ACIR of the Noir circuit to prove */
     circuit: CompiledCircuit,
     /* Define the prover backend to use */
-    private provingBackend: ProvingBackend = "plonk"
+    private provingBackend: ProvingBackend = "plonk",
+    /* Threads to use */
+    private threads: number = 1
   ) {
     // initialize the backends
     if (provingBackend === "plonk" || provingBackend === "all") {
-      this.plonk = new UltraPlonkBackend(circuit.bytecode);
+      this.plonk = new UltraPlonkBackend(circuit.bytecode, { threads: this.threads });
     }
     if (provingBackend === "honk" || provingBackend === "all") {
-      this.honk = new UltraHonkBackend(circuit.bytecode);
+      this.honk = new UltraHonkBackend(circuit.bytecode, { threads: this.threads });
     }
     // initialize the Noir instance
     this.noir = new Noir(circuit);

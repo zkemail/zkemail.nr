@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { ZKEmailProver } from "../src/prover";
 import { generateEmailVerifierInputs }  from "../src/index";
@@ -32,16 +33,17 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
   beforeAll(() => {
     //@ts-ignore
     // prover1024 = new ZKEmailProver(circuit1024, "all");
+    let num_cpus = os.cpus().length;
+    // @ts-ignore
+    prover2048 = new ZKEmailProver(circuit2048, num_cpus);
     //@ts-ignore
-    prover2048 = new ZKEmailProver(circuit2048);
+    proverPartialHash = new ZKEmailProver(circuitPartialHash, num_cpus);
     //@ts-ignore
-    proverPartialHash = new ZKEmailProver(circuitPartialHash);
+    proverMasked = new ZKEmailProver(circuitEmailMask, num_cpus);
     //@ts-ignore
-    proverMasked = new ZKEmailProver(circuitEmailMask);
+    proverExtractAddresses = new ZKEmailProver(circuitExtractAddresses, num_cpus);
     //@ts-ignore
-    proverExtractAddresses = new ZKEmailProver(circuitExtractAddresses);
-    //@ts-ignore
-    proverRemoveSoftLineBreak = new ZKEmailProver(circuitRemoveSoftLineBreak);
+    proverRemoveSoftLineBreak = new ZKEmailProver(circuitRemoveSoftLineBreak, num_cpus);
   });
 
   afterAll(async () => {
