@@ -11,11 +11,8 @@ pub struct RSAPubkey<let KEY_LIMBS: u32> {
 impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
 
     pub fn new(modulus: [Field; KEY_LIMBS], redc: [Field; KEY_LIMBS]) -> Self {
-        Self { modulus, redc }
-    }
-
-    pub fn validate_range(self, signature: [Field; KEY_LIMBS]) {
-        for i in 0..KEY_LIMBS {}
+        let pubkey = Self { modulus, redc };
+        pubkey
     }
 }
 
@@ -39,6 +36,8 @@ impl RSAPubkey<KEY_LIMBS_1024> {
     }
 
     pub fn hash(self) -> Field {
+        // validate
+        self.validate_in_range();
         let mut dkim_preimage = [0; 9];
         // compose first 4 limbs of modulus and redc
         for i in 0..4 {
@@ -52,6 +51,15 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         dkim_preimage[8] = modulus_hi + self.redc[8];
         // hash the pubkey
         pedersen_hash(dkim_preimage)
+    }
+
+    pub fn validate_in_range(self) {
+        for i in 0..(KEY_LIMBS_1024 - 1) {
+            self.modulus[i].assert_max_bit_size::<120>();
+            self.redc[i].assert_max_bit_size::<120>();
+        }
+        self.modulus[KEY_LIMBS_1024 - 1].assert_max_bit_size::<1024 - ((KEY_LIMBS_1024 - 1) * 120)>();
+        self.redc[KEY_LIMBS_1024 - 1].assert_max_bit_size::<1024 - ((KEY_LIMBS_1024 - 1) * 120)>();
     }
 }
 
@@ -75,6 +83,8 @@ impl RSAPubkey<KEY_LIMBS_2048> {
     }
 
     pub fn hash(self) -> Field {
+        // validate range
+        self.validate_in_range();
         let mut dkim_preimage = [0; 18];
         // compose limbs
         for i in 0..9 {
@@ -85,5 +95,14 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         }
         // hash the pubkey
         pedersen_hash(dkim_preimage)
+    }
+
+    pub fn validate_in_range(self) {
+        for i in 0..(KEY_LIMBS_2048 - 1) {
+            self.modulus[i].assert_max_bit_size::<120>();
+            self.redc[i].assert_max_bit_size::<120>();
+        }
+        self.modulus[KEY_LIMBS_2048 - 1].assert_max_bit_size::<2048 - ((KEY_LIMBS_2048 - 1) * 120)>();
+        self.redc[KEY_LIMBS_2048 - 1].assert_max_bit_size::<2048 - ((KEY_LIMBS_2048 - 1) * 120)>();
     }
 }
