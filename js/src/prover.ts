@@ -130,4 +130,23 @@ export class ZKEmailProver {
       await this.honk.destroy();
     }
   }
+
+  /**
+   * Get the verification key for the circuit
+   * @dev defaults to honk - todo remove support for plonk
+   * 
+   * @returns the verification key for the circuit
+   */
+  async vkey(backend: ProvingBackend = 'honk'): Promise<Uint8Array> {
+    if (this.honk && backend === "honk") {
+      return await this.honk.getVerificationKey()
+    } else if (this.plonk && backend === "plonk") {
+      return await this.plonk.getVerificationKey()
+    }
+    throw new Error(`Proving scheme ${backend} not initialized`);
+  }
+
+  async generateVerifierContract(): Promise<string> {
+    this.honk.
+  }
 }

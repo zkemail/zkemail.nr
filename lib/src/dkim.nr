@@ -1,7 +1,8 @@
 use crate::{KEY_LIMBS_1024, KEY_LIMBS_2048, RSA_EXPONENT};
 use bignum::{params::BigNumParams, RuntimeBigNum};
 use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
-use std::hash::{pedersen_hash, sha256_var};
+use sha256::sha256_var;
+use std::hash::poseidon2::Poseidon2;
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
     modulus: [Field; KEY_LIMBS],
@@ -50,7 +51,7 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         let modulus_hi = self.modulus[8] * 2.pow_32(120);
         dkim_preimage[8] = modulus_hi + self.redc[8];
         // hash the pubkey
-        pedersen_hash(dkim_preimage)
+        Poseidon2::hash(dkim_preimage, KEY_LIMBS_1024)
     }
 
     pub fn validate_in_range(self) {
@@ -94,7 +95,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
             dkim_preimage[i + 9] = redc_hi + self.redc[i * 2 + 1];
         }
         // hash the pubkey
-        pedersen_hash(dkim_preimage)
+        Poseidon2::hash(dkim_preimage, KEY_LIMBS_2048)
     }
 
     pub fn validate_in_range(self) {

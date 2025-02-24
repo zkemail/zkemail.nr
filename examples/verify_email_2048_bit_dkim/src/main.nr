@@ -1,5 +1,7 @@
-use std::{collections::bounded_vec::BoundedVec, hash::{pedersen_hash, sha256_var}};
-use zkemail::{dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048, Sequence};
+use std::hash::poseidon2::Poseidon2;
+use regex::capture::composite::decoded_body_hash;
+use sha256::sha256_var;
+use zkemail::{dkim::RSAPubkey, KEY_LIMBS_2048};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
@@ -23,24 +25,14 @@ fn main(
     body: BoundedVec<u8, MAX_EMAIL_BODY_LENGTH>,
     pubkey: RSAPubkey<KEY_LIMBS_2048>,
     signature: [Field; KEY_LIMBS_2048],
-    body_hash_index: u32,
-    dkim_header_sequence: Sequence,
 ) -> pub [Field; 2] {
-    // check the body and header lengths are within bounds
-    assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
-    assert(body.len() <= MAX_EMAIL_BODY_LENGTH);
-
-    // ~ 86,553 constraints
-    // verify the dkim signature over the header
     pubkey.verify_dkim_signature(header, signature);
 
-    // ~ 6,289 constraints
-    // extract the body hash from the header
-    let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
+    let signed_body_hash = decoded_body_hash::regex_match(header);
 
     // ~ 113,962 constraints
     // hash the asserted body
-    let computed_body_hash: [u8; 32] = sha256_var(body.storage, body.len() as u64);
+    let computed_body_hash: [u8; 32] = sha256_var(body.storage(), body.len() as u64);
 
     // compare the body hashes
     assert(
@@ -50,6 +42,6 @@ fn main(
 
     // ~ 10,255 constraints
     // hash the pubkey and signature for the standard outputs
-    let email_nullifier = pedersen_hash(signature);
+    let email_nullifier = Posiedon2.hash(signature, 1);
     [pubkey.hash(), email_nullifier]
 }
