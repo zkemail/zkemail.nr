@@ -71,3 +71,13 @@ unconstrained fn __blinded_nullifier<let KEY_LIMBS: u32>(
 
     nullifier_preimage
 }
+
+/**
+ * Helper function to convert an array of fields to u128
+ * 
+ * @param signature - The signature to nullify
+ * @param nonce - The nonce to use in the nullifier as a blinding factor
+ */
+pub fn to_u128_array<let N: u32>(field_array: [Field; N]) -> [u128; N] {
+    field_array.map(|el| el as u128)
+}
