@@ -51,12 +51,14 @@ mod test_success {
         let from = comptime { "from".as_bytes() };
         let to = comptime { "to".as_bytes() };
         // 16k gate cost? has to be able to be brought down
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let from_address = get_email_address(
             EmailLarge::HEADER,
             EmailLarge::FROM_HEADER_SEQUENCE,
             EmailLarge::FROM_ADDRESS_SEQUENCE,
             from,
         );
+        // @todo: Replace with to_addr regex once ICE error is resolved
         let to_address = get_email_address(
             EmailLarge::HEADER,
             EmailLarge::TO_HEADER_SEQUENCE,
@@ -200,6 +202,7 @@ mod test_address_extraction {
     fn test_email_only() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::ADDRESS_ONLY);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let address = get_email_address(
             header,
             EmailAddresses::ADDRESS_ONLY_FIELD_SEQUENCE,
@@ -213,6 +216,7 @@ mod test_address_extraction {
     fn test_no_brackets() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::NO_BRACKETS);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let address = get_email_address(
             header,
             EmailAddresses::NO_BRACKETS_FIELD_SEQUENCE,
@@ -226,6 +230,7 @@ mod test_address_extraction {
     fn test_brackets() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::BRACKETS);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let address = get_email_address(
             header,
             EmailAddresses::BRACKETS_FIELD_SEQUENCE,
@@ -239,6 +244,7 @@ mod test_address_extraction {
     fn test_quotes() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let address = get_email_address(
             header,
             EmailAddresses::QUOTES_FIELD_SEQUENCE,
@@ -252,6 +258,7 @@ mod test_address_extraction {
     fn test_malicious_display_name() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::QUOTES_FIELD_SEQUENCE,
@@ -268,6 +275,7 @@ mod test_address_extraction {
         malicious_sequence.index = malicious_sequence.index + 8;
         malicious_sequence.length = malicious_sequence.length - 8;
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::QUOTES_FIELD_SEQUENCE,
@@ -284,6 +292,7 @@ mod test_address_extraction {
         malicious_sequence.index = malicious_sequence.index;
         malicious_sequence.length = malicious_sequence.length - 4;
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::QUOTES_FIELD_SEQUENCE,
@@ -300,6 +309,7 @@ mod test_address_extraction {
         malicious_sequence.index = malicious_sequence.index + 8;
         malicious_sequence.length = malicious_sequence.length - 8;
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::ADDRESS_ONLY);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::ADDRESS_ONLY_FIELD_SEQUENCE,
@@ -316,6 +326,7 @@ mod test_address_extraction {
         malicious_sequence.index = malicious_sequence.index;
         malicious_sequence.length = malicious_sequence.length - 4;
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::ADDRESS_ONLY);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::ADDRESS_ONLY_FIELD_SEQUENCE,

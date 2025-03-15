@@ -86,6 +86,7 @@ use zkemail::get_email_address;
   // define the header field to access (set "to" or "from")
   let to = comptime { "to".as_bytes() };
   // constrained retrieval of the email header
+  // @todo: Replace with to_addr regex once ICE error is resolved
   let to_address = get_email_address(header, to_header_sequence, to_address_sequence, to);
 ...
 ```
