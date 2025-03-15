@@ -25,7 +25,7 @@ mod test_success {
         );
         // compute the body hash
         let computed_body_hash: [u8; 32] =
-            sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len() as u64);
+            sha256::sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len() as u64);
         // compare the body hashes
         assert(
             signed_body_hash == computed_body_hash,
@@ -110,7 +110,7 @@ mod test_tampered_hash {
         let mut tampered_body = unsafe { EmailLarge::tampered_body() };
         // compute the body hash
         let tampered_body_hash: [u8; 32] =
-            sha256_var(tampered_body.storage(), tampered_body.len() as u64);
+            sha256::sha256_var(tampered_body.storage(), tampered_body.len() as u64);
         // compare the body hashes
         assert(
             signed_body_hash != tampered_body_hash,
