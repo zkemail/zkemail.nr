@@ -1,6 +1,5 @@
 use crate::{CR, LF, Sequence};
 
-pub mod body_hash;
 pub mod email_address;
 
 /**

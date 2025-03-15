@@ -6,3 +6,4 @@ compiler_version = ">=1.0.0"
 
 [dependencies]
 zkemail = { path =  "../../lib"}
+zkregex = { path = "../../../noir-zk-regex/packages/noir" }
