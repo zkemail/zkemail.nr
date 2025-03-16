@@ -40,7 +40,9 @@ fn main(
     let from = comptime { "from".as_bytes() };
     let to = comptime { "to".as_bytes() };
     // 16k gate cost? has to be able to be brought down
+    // @todo: Replace with from_addr regex once ICE error is resolved
     let from_address = get_email_address(header, from_header_sequence, from_address_sequence, from);
+    // @todo: Replace with to_addr regex once ICE error is resolved
     let to_address = get_email_address(header, to_header_sequence, to_address_sequence, to);
 
     // hash the pubkey and signature for the standard outputs
