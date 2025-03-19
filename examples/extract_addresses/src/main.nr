@@ -3,6 +3,7 @@ use zkemail::{
     dkim::RSAPubkey, headers::email_address::get_email_address, KEY_LIMBS_2048,
     MAX_EMAIL_ADDRESS_LENGTH, Sequence,
 };
+use zkregex::capture::composite::from_addr;
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 
@@ -25,8 +26,6 @@ fn main(
     header: BoundedVec<u8, MAX_EMAIL_HEADER_LENGTH>,
     pubkey: RSAPubkey<KEY_LIMBS_2048>,
     signature: [Field; KEY_LIMBS_2048],
-    from_header_sequence: Sequence,
-    from_address_sequence: Sequence,
     to_header_sequence: Sequence,
     to_address_sequence: Sequence,
     ) -> pub ([Field; 2], BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>, BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>) {
@@ -37,16 +36,16 @@ fn main(
     pubkey.verify_dkim_signature(header, signature);
 
     // extract to and from email addresses
-    let from = comptime { "from".as_bytes() };
     let to = comptime { "to".as_bytes() };
     // 16k gate cost? has to be able to be brought down
     // @todo: Replace with from_addr regex once ICE error is resolved
-    let from_address = get_email_address(header, from_header_sequence, from_address_sequence, from);
+    // let from_address = get_email_address(header, from_header_sequence, from_address_sequence, from);
+    let from_address = from_addr::regex_match(header.storage);
     // @todo: Replace with to_addr regex once ICE error is resolved
     let to_address = get_email_address(header, to_header_sequence, to_address_sequence, to);
 
     // hash the pubkey and signature for the standard outputs
     let email_nullifier = pedersen_hash(signature);
     let standard_out = [pubkey.hash(), email_nullifier];
-    (standard_out, from_address, to_address)
+    (standard_out, from_address.0, to_address)
 }
