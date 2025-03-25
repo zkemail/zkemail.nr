@@ -1,0 +1,6 @@
+
+Command: shopt -s histappend
+Output:
+
+Exit Code: 0
+----
