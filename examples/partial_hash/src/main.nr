@@ -1,8 +1,6 @@
 use std::hash::pedersen_hash;
-use zkemail::{
-    dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048,
-    partial_hash::partial_sha256_var_end, Sequence,
-};
+use zkemail::{dkim::RSAPubkey, KEY_LIMBS_2048, partial_hash::partial_sha256_var_end, Sequence};
+use zkregex::capture::composite::decoded_body_hash;
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
 global MAX_PARTIAL_EMAIL_BODY_LENGTH: u32 = 192;
@@ -29,8 +27,6 @@ fn main(
     body: BoundedVec<u8, MAX_PARTIAL_EMAIL_BODY_LENGTH>,
     pubkey: RSAPubkey<KEY_LIMBS_2048>,
     signature: [Field; KEY_LIMBS_2048],
-    body_hash_index: u32,
-    dkim_header_sequence: Sequence,
     partial_body_hash: [u32; 8],
     partial_body_real_length: u64,
 ) -> pub [Field; 2] {
@@ -45,7 +41,7 @@ fn main(
     pubkey.verify_dkim_signature(header, signature);
 
     // manually extract the body hash from the header
-    let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
+    let signed_body_hash = decoded_body_hash::regex_match(header);
 
     // finish the partial hash
     let computed_body_hash = partial_sha256_var_end(

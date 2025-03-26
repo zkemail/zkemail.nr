@@ -1,9 +1,8 @@
 [package]
-name = "extract_addresses"
+name = "reveal_substring"
 type = "bin"
 authors = ["Mach 34"]
 compiler_version = ">=1.0.0"
 
 [dependencies]
 zkemail = { path =  "../../lib"}
-zkregex = { path = "../../../noir-zk-regex/packages/noir" }

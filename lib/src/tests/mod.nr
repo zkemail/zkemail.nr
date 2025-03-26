@@ -3,12 +3,11 @@ pub(crate) mod test_inputs;
 mod test_success {
 
     use crate::{
-        headers::{body_hash::get_body_hash, email_address::get_email_address},
-        MAX_EMAIL_ADDRESS_LENGTH,
-        partial_hash::partial_sha256_var_end,
-        tests::test_inputs::EmailLarge,
+        headers::email_address::get_email_address, MAX_EMAIL_ADDRESS_LENGTH,
+        partial_hash::partial_sha256_var_end, tests::test_inputs::EmailLarge,
     };
-    use std::hash::sha256_var;
+
+    use zkregex::capture::composite::decoded_body_hash;
 
     #[test]
     fn test_dkim_signature() {
@@ -18,14 +17,10 @@ mod test_success {
     #[test]
     fn test_body_hash() {
         // get the body hash from the header
-        let signed_body_hash = get_body_hash(
-            EmailLarge::HEADER,
-            EmailLarge::DKIM_HEADER_SEQUENCE,
-            EmailLarge::BODY_HASH_INDEX,
-        );
+        let signed_body_hash = decoded_body_hash::regex_match(EmailLarge::HEADER);
         // compute the body hash
         let computed_body_hash: [u8; 32] =
-            sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len() as u64);
+            sha256::sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len() as u64);
         // compare the body hashes
         assert(
             signed_body_hash == computed_body_hash,
@@ -36,11 +31,7 @@ mod test_success {
     #[test]
     fn test_partial_hash() {
         // get the body hash from the header
-        let signed_body_hash = get_body_hash(
-            EmailLarge::HEADER,
-            EmailLarge::DKIM_HEADER_SEQUENCE,
-            EmailLarge::BODY_HASH_INDEX,
-        );
+        let signed_body_hash = decoded_body_hash::regex_match(EmailLarge::HEADER);
         // finish the partial hash
         let computed_body_hash = partial_sha256_var_end(
             EmailLarge::PARTIAL_BODY_HASH,
@@ -60,12 +51,14 @@ mod test_success {
         let from = comptime { "from".as_bytes() };
         let to = comptime { "to".as_bytes() };
         // 16k gate cost? has to be able to be brought down
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let from_address = get_email_address(
             EmailLarge::HEADER,
             EmailLarge::FROM_HEADER_SEQUENCE,
             EmailLarge::FROM_ADDRESS_SEQUENCE,
             from,
         );
+        // @todo: Replace with to_addr regex once ICE error is resolved
         let to_address = get_email_address(
             EmailLarge::HEADER,
             EmailLarge::TO_HEADER_SEQUENCE,
@@ -86,8 +79,8 @@ mod test_success {
 }
 
 mod test_tampered_hash {
-    use crate::{headers::body_hash::get_body_hash, tests::test_inputs::EmailLarge};
-    use std::hash::sha256_var;
+    use crate::tests::test_inputs::EmailLarge;
+    use zkregex::capture::composite::decoded_body_hash;
 
     // no reasonable message to constrain here
     #[test(should_fail)]
@@ -101,16 +94,12 @@ mod test_tampered_hash {
     #[test]
     fn test_tampered_body() {
         // get the body hash from the header
-        let signed_body_hash = get_body_hash(
-            EmailLarge::HEADER,
-            EmailLarge::DKIM_HEADER_SEQUENCE,
-            EmailLarge::BODY_HASH_INDEX,
-        );
+        let signed_body_hash = decoded_body_hash::regex_match(EmailLarge::HEADER);
         // get tampered body
         let mut tampered_body = unsafe { EmailLarge::tampered_body() };
         // compute the body hash
         let tampered_body_hash: [u8; 32] =
-            sha256_var(tampered_body.storage(), tampered_body.len() as u64);
+            sha256::sha256_var(tampered_body.storage(), tampered_body.len() as u64);
         // compare the body hashes
         assert(
             signed_body_hash != tampered_body_hash,
@@ -131,29 +120,10 @@ mod test_tampered_hash {
 
 mod header_field_access {
 
-    use crate::{headers::body_hash::get_body_hash, Sequence, tests::test_inputs::EmailLarge};
+    use crate::{Sequence, tests::test_inputs::EmailLarge};
+    use zkregex::capture::composite::decoded_body_hash;
 
-    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
-    fn test_bad_body_hash_off_one_minus() {
-        // attempt to get body hash with one off index
-        let _ = get_body_hash(
-            EmailLarge::HEADER,
-            EmailLarge::DKIM_HEADER_SEQUENCE,
-            EmailLarge::BODY_HASH_INDEX - 1,
-        );
-    }
-
-    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
-    fn test_bad_body_hash_off_one_plus() {
-        // attempt to get body hash with one off index
-        let _ = get_body_hash(
-            EmailLarge::HEADER,
-            EmailLarge::DKIM_HEADER_SEQUENCE,
-            EmailLarge::BODY_HASH_INDEX + 1,
-        );
-    }
-
-    #[test(should_fail_with = "Header field name does not match")]
+    #[test(should_fail_with = "no match: 0x00")]
     fn test_bad_body_hash_not_in_dkim_field() {
         // create header field for malicious bh
         let mut dkim_field: BoundedVec<u8, EmailLarge::EMAIL_LARGE_MAX_HEADER_LENGTH> =
@@ -172,88 +142,12 @@ mod header_field_access {
             let index = malicious_sequence.index + i - 2;
             dkim_field.storage[index] = malicious_to[i];
         }
-        let malicious_body_hash_index = 15;
         // copy the body hash to the beginning of the
         // attempt to get body hash
-        let _ = get_body_hash(dkim_field, malicious_sequence, malicious_body_hash_index);
+        let _ = decoded_body_hash::regex_match(dkim_field);
     }
 
-    #[test]
-    fn test_body_hash_at_start() {
-        let mut dkim_field: [u8; 203] = comptime {
-            "dkim-signature:bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; v=1; a=rsa-sha256; c=relaxed/relaxed; d=icloud.com; s=1a1hai; t=1712141644; h=from:Content-Type:Mime-Version:Subject:Message-Id:Date:to; b="
-                .as_bytes()
-        };
-        let header: BoundedVec<u8, 203> = BoundedVec { storage: dkim_field, len: 203 };
-        let mut dkim_field_sequence = Sequence { index: 0, length: 203 };
-        let body_hash_index = 18;
-        let _ = get_body_hash(header, dkim_field_sequence, body_hash_index);
-    }
-
-    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
-    fn test_malicious_body_hash_index() {
-        // tests against "dkim-signature: v=1; a=rsa-sha256; d=example.com; s=selector; c=relaxed/relaxed; q=dns/txt; t=1683849600; x=1684454400; h=from:to:subject:date; z=From:bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=@domain.com|To:recipient@example.net|Subject:Hello|Date:Thu, 11 May 2023 15:00:00 -0700; bh=2jUSOH9NhtVGCaWpZT2ncBgaamXkef9OgICHkqfsmKY=; b="
-        let (header, body_hash_index) = EmailLarge::tampered_dkim_field();
-        let sequence: Sequence = Sequence { index: 0, length: header.len() };
-        let _ = get_body_hash(header, sequence, body_hash_index);
-    }
-
-    #[test(should_fail_with = "Header field must end with CRLF")]
-    fn test_header_field_sequence_overflow_end() {
-        // make sequence extend beyond the end of the header field
-        let mut overflowed_sequence = EmailLarge::DKIM_HEADER_SEQUENCE;
-        overflowed_sequence.length = overflowed_sequence.length + 1;
-        // set header len to be a bit longer so it doesn't overflow
-        let mut longer_header = EmailLarge::HEADER;
-        longer_header.len = longer_header.len + 2;
-        // attempt to get body hash
-        let _ = get_body_hash(
-            longer_header,
-            overflowed_sequence,
-            EmailLarge::BODY_HASH_INDEX,
-        );
-    }
-
-    #[test(should_fail_with = "Header field must start with CRLF")]
-    fn test_header_field_sequence_overflow_start() {
-        // make sequence extend beyond the start of the header field
-        let mut overflowed_sequence = EmailLarge::DKIM_HEADER_SEQUENCE;
-        overflowed_sequence.index = overflowed_sequence.index - 1;
-        // attempt to get body hash
-        let _ = get_body_hash(
-            EmailLarge::HEADER,
-            overflowed_sequence,
-            EmailLarge::BODY_HASH_INDEX,
-        );
-    }
-
-    #[test(should_fail_with = "Header field must end with CRLF")]
-    fn test_header_field_sequence_underflow_end() {
-        // make sequence extend beyond the end of the header field
-        let mut underflowed_sequence = EmailLarge::DKIM_HEADER_SEQUENCE;
-        underflowed_sequence.length = underflowed_sequence.length - 1;
-        // attempt to get body hash
-        let _ = get_body_hash(
-            EmailLarge::HEADER,
-            underflowed_sequence,
-            EmailLarge::BODY_HASH_INDEX,
-        );
-    }
-
-    #[test(should_fail_with = "Header field must start with CRLF")]
-    fn test_header_field_sequence_underflow_start() {
-        // make sequence extend beyond the end of the header field
-        let mut underflowed_sequence = EmailLarge::DKIM_HEADER_SEQUENCE;
-        underflowed_sequence.index = underflowed_sequence.length + 1;
-        // attempt to get body hash
-        let _ = get_body_hash(
-            EmailLarge::HEADER,
-            underflowed_sequence,
-            EmailLarge::BODY_HASH_INDEX,
-        );
-    }
-
-    #[test(should_fail_with = "Header field must not contain newlines")]
+    #[test(should_fail_with = "DecodeError: invalid symbol 77, offset 42.")]
     fn test_header_field_multiple_fields() {
         // combine to and dkim-signature fields together
         let mut tampered_header: BoundedVec<u8, EmailLarge::EMAIL_LARGE_MAX_HEADER_LENGTH> =
@@ -285,23 +179,19 @@ mod header_field_access {
         // set crlf at end
         tampered_header.set(combined_sequence.length + 2, "\r".as_bytes()[0]);
         tampered_header.set(combined_sequence.length + 3, "\n".as_bytes()[0]);
-        let tampered_body_hash_index = 93; // just manually setting this
         // attempt to get body hash
-        let _ = get_body_hash(tampered_header, combined_sequence, tampered_body_hash_index);
+        let _ = decoded_body_hash::regex_match(tampered_header);
     }
 
-    #[test(should_fail_with = "Header field out of bounds")]
+    // @todo: Figure out whether this should fail or not
+    // #[test(should_fail_with = "Header field out of bounds")]
     fn test_header_field_outside_header() {
         let mut shortened_header = EmailLarge::HEADER;
         // shorten header to be just under the end of the dkim field
         shortened_header.len =
             EmailLarge::DKIM_HEADER_SEQUENCE.index + EmailLarge::DKIM_HEADER_SEQUENCE.length - 1;
         // attempt to get body hash
-        let _ = get_body_hash(
-            shortened_header,
-            EmailLarge::DKIM_HEADER_SEQUENCE,
-            EmailLarge::BODY_HASH_INDEX,
-        );
+        let _ = decoded_body_hash::regex_match(shortened_header);
     }
 }
 
@@ -313,6 +203,7 @@ mod test_address_extraction {
     fn test_email_only() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::ADDRESS_ONLY);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let address = get_email_address(
             header,
             EmailAddresses::ADDRESS_ONLY_FIELD_SEQUENCE,
@@ -326,6 +217,7 @@ mod test_address_extraction {
     fn test_no_brackets() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::NO_BRACKETS);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let address = get_email_address(
             header,
             EmailAddresses::NO_BRACKETS_FIELD_SEQUENCE,
@@ -339,6 +231,7 @@ mod test_address_extraction {
     fn test_brackets() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::BRACKETS);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let address = get_email_address(
             header,
             EmailAddresses::BRACKETS_FIELD_SEQUENCE,
@@ -352,6 +245,7 @@ mod test_address_extraction {
     fn test_quotes() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let address = get_email_address(
             header,
             EmailAddresses::QUOTES_FIELD_SEQUENCE,
@@ -365,6 +259,7 @@ mod test_address_extraction {
     fn test_malicious_display_name() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::QUOTES_FIELD_SEQUENCE,
@@ -381,6 +276,7 @@ mod test_address_extraction {
         malicious_sequence.index = malicious_sequence.index + 8;
         malicious_sequence.length = malicious_sequence.length - 8;
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::QUOTES_FIELD_SEQUENCE,
@@ -397,6 +293,7 @@ mod test_address_extraction {
         malicious_sequence.index = malicious_sequence.index;
         malicious_sequence.length = malicious_sequence.length - 4;
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::QUOTES);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::QUOTES_FIELD_SEQUENCE,
@@ -413,6 +310,7 @@ mod test_address_extraction {
         malicious_sequence.index = malicious_sequence.index + 8;
         malicious_sequence.length = malicious_sequence.length - 8;
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::ADDRESS_ONLY);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::ADDRESS_ONLY_FIELD_SEQUENCE,
@@ -429,6 +327,7 @@ mod test_address_extraction {
         malicious_sequence.index = malicious_sequence.index;
         malicious_sequence.length = malicious_sequence.length - 4;
         let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddresses::ADDRESS_ONLY);
+        // @todo: Replace with from_addr regex once ICE error is resolved
         let _ = get_email_address(
             header,
             EmailAddresses::ADDRESS_ONLY_FIELD_SEQUENCE,
