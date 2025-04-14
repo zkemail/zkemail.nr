@@ -8,7 +8,6 @@ mod test_success {
         partial_hash::partial_sha256_var_end,
         tests::test_inputs::EmailLarge,
     };
-    use std::hash::sha256_var;
 
     #[test]
     fn test_dkim_signature() {
@@ -87,7 +86,6 @@ mod test_success {
 
 mod test_tampered_hash {
     use crate::{headers::body_hash::get_body_hash, tests::test_inputs::EmailLarge};
-    use std::hash::sha256_var;
 
     // no reasonable message to constrain here
     #[test(should_fail)]

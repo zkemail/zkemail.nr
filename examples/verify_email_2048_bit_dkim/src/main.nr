@@ -1,4 +1,5 @@
-use std::{collections::bounded_vec::BoundedVec, hash::{pedersen_hash, sha256_var}};
+use sha256::sha256_var;
+use std::{collections::bounded_vec::BoundedVec, hash::pedersen_hash};
 use zkemail::{dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048, Sequence};
 
 global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
