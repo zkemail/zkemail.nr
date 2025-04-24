@@ -21,7 +21,7 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         self,
         header: BoundedVec<u8, MAX_HEADER_LENGTH>,
         signature: [Field; KEY_LIMBS_1024],
-    ) {
+    ) -> [u8; 32] {
         // hash the header
         let header_hash = sha256_var(header.storage(), header.len() as u64);
 
@@ -33,6 +33,8 @@ impl RSAPubkey<KEY_LIMBS_1024> {
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
+
+        header_hash
     }
 
     pub fn hash(self) -> Field {
@@ -68,7 +70,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         self,
         header: BoundedVec<u8, MAX_HEADER_LENGTH>,
         signature: [Field; KEY_LIMBS_2048],
-    ) {
+    ) -> [u8; 32] {
         // hash the header
         let header_hash = sha256_var(header.storage(), header.len() as u64);
 
@@ -80,6 +82,8 @@ impl RSAPubkey<KEY_LIMBS_2048> {
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
+
+        header_hash
     }
 
     pub fn hash(self) -> Field {

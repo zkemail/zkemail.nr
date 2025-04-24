@@ -4,6 +4,7 @@ pub mod headers;
 pub mod masking;
 pub mod partial_hash;
 pub mod remove_soft_line_breaks;
+pub mod utils;
 mod tests;
 
 global RSA_EXPONENT: u32 = 65537;
