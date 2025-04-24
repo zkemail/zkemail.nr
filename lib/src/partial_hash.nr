@@ -363,7 +363,7 @@ fn test_partial_hash() {
     }
     let state = partial_sha256_var_start(data0);
     let hash = partial_sha256_var_end(state, data1, data1.len() as u64, DATA.len() as u64);
-    let correct_hash = std::hash::sha256_var(DATA, DATA.len() as u64);
+    let correct_hash = sha256::sha256_var(DATA, DATA.len() as u64);
     assert_eq(hash, correct_hash);
 }
 
@@ -385,7 +385,7 @@ fn test_partial_hash_interstitial() {
         data2.len() as u64,
         DATA.len() as u64,
     );
-    let correct_hash = std::hash::sha256_var(DATA, DATA.len() as u64);
+    let correct_hash = sha256::sha256_var(DATA, DATA.len() as u64);
     assert_eq(hash, correct_hash);
 }
 
@@ -407,6 +407,6 @@ fn test_partial_hash_interstitial_var() {
         data2.len() as u64,
         DATA.len() as u64,
     );
-    let correct_hash = std::hash::sha256_var(DATA, DATA.len() as u64);
+    let correct_hash = sha256::sha256_var(DATA, DATA.len() as u64);
     assert_eq(hash, correct_hash);
 }

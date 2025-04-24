@@ -8,7 +8,6 @@ mod test_success {
         partial_hash::partial_sha256_var_end,
         tests::test_inputs::EmailLarge,
     };
-    use std::hash::sha256_var;
 
     #[test]
     fn test_dkim_signature() {
@@ -25,7 +24,7 @@ mod test_success {
         );
         // compute the body hash
         let computed_body_hash: [u8; 32] =
-            sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len() as u64);
+            sha256::sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len() as u64);
         // compare the body hashes
         assert(
             signed_body_hash == computed_body_hash,
@@ -87,7 +86,6 @@ mod test_success {
 
 mod test_tampered_hash {
     use crate::{headers::body_hash::get_body_hash, tests::test_inputs::EmailLarge};
-    use std::hash::sha256_var;
 
     // no reasonable message to constrain here
     #[test(should_fail)]
@@ -110,7 +108,7 @@ mod test_tampered_hash {
         let mut tampered_body = unsafe { EmailLarge::tampered_body() };
         // compute the body hash
         let tampered_body_hash: [u8; 32] =
-            sha256_var(tampered_body.storage(), tampered_body.len() as u64);
+            sha256::sha256_var(tampered_body.storage(), tampered_body.len() as u64);
         // compare the body hashes
         assert(
             signed_body_hash != tampered_body_hash,

@@ -1,7 +1,8 @@
 use crate::{KEY_LIMBS_1024, KEY_LIMBS_2048, RSA_EXPONENT};
+use super::to_u128_array;
 use bignum::{params::BigNumParams, RuntimeBigNum};
 use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
-use std::hash::{pedersen_hash, sha256_var};
+use std::hash::pedersen_hash;
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
     modulus: [Field; KEY_LIMBS],
@@ -23,12 +24,12 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         signature: [Field; KEY_LIMBS_1024],
     ) -> [u8; 32] {
         // hash the header
-        let header_hash = sha256_var(header.storage(), header.len() as u64);
+        let header_hash = sha256::sha256_var(header.storage(), header.len() as u64);
 
         let params: BigNumParams<KEY_LIMBS_1024, 1024> =
-            BigNumParams::new(false, self.modulus, self.redc);
+            BigNumParams::new(false, to_u128_array(self.modulus), to_u128_array(self.redc));
 
-        let signature: RBN1024 = RuntimeBigNum::from_array(params, signature);
+        let signature: RBN1024 = RuntimeBigNum::from_array(params, to_u128_array(signature));
         signature.validate_in_range();
 
         // verify the DKIM signature over the header
@@ -72,12 +73,12 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         signature: [Field; KEY_LIMBS_2048],
     ) -> [u8; 32] {
         // hash the header
-        let header_hash = sha256_var(header.storage(), header.len() as u64);
+        let header_hash = sha256::sha256_var(header.storage(), header.len() as u64);
 
         let params: BigNumParams<KEY_LIMBS_2048, 2048> =
-            BigNumParams::new(false, self.modulus, self.redc);
+            BigNumParams::new(false, to_u128_array(self.modulus), to_u128_array(self.redc));
 
-        let signature: RBN2048 = RuntimeBigNum::from_array(params, signature);
+        let signature: RBN2048 = RuntimeBigNum::from_array(params, to_u128_array(signature));
         signature.validate_in_range();
 
         // verify the DKIM signature over the header

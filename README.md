@@ -29,7 +29,8 @@ use zkemail::{
     KEY_LIMBS_1024, dkim::RSAPubkey, get_body_hash_by_index,     
     base64::body_hash_base64_decode
 };
-use std::hash::{sha256_var, pedersen_hash};
+use std::hash::pedersen_hash;
+use sha256::sha256_var;
 
 // Somewhere in your function
 ...
