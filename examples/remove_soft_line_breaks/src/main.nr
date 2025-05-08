@@ -1,4 +1,5 @@
-use std::hash::{pedersen_hash, sha256_var};
+use sha256::sha256_var;
+use std::hash::pedersen_hash;
 use zkemail::{
     dkim::RSAPubkey, headers::body_hash::get_body_hash, KEY_LIMBS_2048,
     remove_soft_line_breaks::remove_soft_line_breaks, Sequence,

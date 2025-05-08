@@ -70,4 +70,3 @@ pub fn parse_email_address<let MAX_HEADER_LENGTH: u32>(
     // todo: should probably introduce a check for @
     email_address
 }
-

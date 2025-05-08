@@ -1,7 +1,8 @@
 use crate::{KEY_LIMBS_1024, KEY_LIMBS_2048, RSA_EXPONENT};
 use bignum::{params::BigNumParams, RuntimeBigNum};
 use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
-use std::hash::{pedersen_hash, sha256_var};
+use sha256::sha256_var;
+use std::hash::pedersen_hash;
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
     modulus: [Field; KEY_LIMBS],
@@ -25,10 +26,14 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         // hash the header
         let header_hash = sha256_var(header.storage(), header.len() as u64);
 
-        let params: BigNumParams<KEY_LIMBS_1024, 1024> =
-            BigNumParams::new(false, self.modulus, self.redc);
+        let params: BigNumParams<KEY_LIMBS_1024, 1024> = BigNumParams::new(
+            false,
+            convert_field_to_u128(self.modulus),
+            convert_field_to_u128(self.redc),
+        );
 
-        let signature: RBN1024 = RuntimeBigNum::from_array(params, signature);
+        let signature: RBN1024 =
+            RuntimeBigNum::from_array(params, convert_field_to_u128(signature));
         signature.validate_in_range();
 
         // verify the DKIM signature over the header
@@ -74,10 +79,14 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         // hash the header
         let header_hash = sha256_var(header.storage(), header.len() as u64);
 
-        let params: BigNumParams<KEY_LIMBS_2048, 2048> =
-            BigNumParams::new(false, self.modulus, self.redc);
+        let params: BigNumParams<KEY_LIMBS_2048, 2048> = BigNumParams::new(
+            false,
+            convert_field_to_u128(self.modulus),
+            convert_field_to_u128(self.redc),
+        );
 
-        let signature: RBN2048 = RuntimeBigNum::from_array(params, signature);
+        let signature: RBN2048 =
+            RuntimeBigNum::from_array(params, convert_field_to_u128(signature));
         signature.validate_in_range();
 
         // verify the DKIM signature over the header
@@ -109,4 +118,13 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         self.modulus[KEY_LIMBS_2048 - 1].assert_max_bit_size::<2048 - ((KEY_LIMBS_2048 - 1) * 120)>();
         self.redc[KEY_LIMBS_2048 - 1].assert_max_bit_size::<120>(); // we get 2053 sometimes?
     }
+}
+
+// convert a Field array to a u128 array with generic number of limbs
+fn convert_field_to_u128<let KEY_LIMBS: u32>(signature: [Field; KEY_LIMBS]) -> [u128; KEY_LIMBS] {
+    let mut u128_signature: [u128; KEY_LIMBS] = [0; KEY_LIMBS];
+    for i in 0..KEY_LIMBS {
+        u128_signature[i] = signature[i] as u128;
+    }
+    u128_signature
 }

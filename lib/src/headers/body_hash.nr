@@ -86,5 +86,5 @@ pub fn get_body_hash_unsafe<let MAX_HEADER_LENGTH: u32>(
     }
     // return the decoded body hash
     // idk why encode vs decode...
-    BASE64_DECODER.decode(body_hash_encoded)
+    BASE64_DECODER::decode(body_hash_encoded)
 }
