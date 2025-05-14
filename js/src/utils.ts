@@ -1,3 +1,5 @@
+import { buildPoseidon } from "circomlibjs";
+
 export type Sequence = {
   index: string;
   length: string;
@@ -47,7 +49,9 @@ export function toProverToml(inputs: any): string {
       let values = "";
       for (const [k, v] of Object.entries(value!)) {
         if (Array.isArray(v)) {
-          values = values.concat(`${k} = [${v.map((val) => `'${val}'`).join(", ")}]\n`);
+          values = values.concat(
+            `${k} = [${v.map((val) => `'${val}'`).join(", ")}]\n`
+          );
         } else {
           values = values.concat(`${k} = '${v}'\n`);
         }
@@ -75,8 +79,12 @@ export function getHeaderSequence(
       .toLowerCase()}:.*(?:\r?\n)?`
   );
   const match = header.toString().match(regex);
-  if (match === null) throw new Error(`Field "${headerField}" not found in header`);
-  return { index: match.index!.toString(), length: match[0].length.toString() };
+  if (match === null)
+    throw new Error(`Field "${headerField}" not found in header`);
+  return {
+    index: match.index!.toString(),
+    length: match[0].length.toString(),
+  };
 }
 
 /**
@@ -87,10 +95,7 @@ export function getHeaderSequence(
  * @param headerField - the field name to search for
  * @returns - the index and length of the field in the header and the index and length of the address in the field
  */
-export function getAddressHeaderSequence(
-  header: Buffer,
-  headerField: string
-) {
+export function getAddressHeaderSequence(header: Buffer, headerField: string) {
   const regexPrefix = `[${headerField[0].toUpperCase()}${headerField[0].toLowerCase()}]${headerField
     .slice(1)
     .toLowerCase()}`;
@@ -99,8 +104,10 @@ export function getAddressHeaderSequence(
   );
   const headerStr = header.toString();
   const match = headerStr.match(regex);
-  if (match === null) throw new Error(`Field "${headerField}" not found in header`);
-  if (match[1] === null && match[2] === null) throw new Error(`Address not found in "${headerField}" field`);
+  if (match === null)
+    throw new Error(`Field "${headerField}" not found in header`);
+  if (match[1] === null && match[2] === null)
+    throw new Error(`Address not found in "${headerField}" field`);
   const address = match[1] || match[2];
   const addressIndex = headerStr.indexOf(address);
   return [
@@ -140,4 +147,74 @@ export function makeEmailAddressCharTable(): string {
   }
   tableStr += "];";
   return tableStr;
+}
+
+/**
+ * Hashes an RSA public key (modulus and redc limbs) using a hierarchical Poseidon scheme,
+ * mirroring the logic in zkemail.nr's RSAPubkey<KEY_LIMBS_2048>::hash function.
+ *
+ * The process is:
+ * 1. Modulus and Redc are each provided as 18 x 120-bit limbs.
+ * 2. Two 'chunks' of 9 elements each are formed:
+ *    - chunk1_element[i] = modulus_limb[2i] * 2^120 + modulus_limb[2i+1]
+ *    - chunk2_element[i] = redc_limb[2i] * 2^120 + redc_limb[2i+1]
+ * 3. Poseidon(chunk1) -> hash1
+ * 4. Poseidon(chunk2) -> hash2
+ * 5. Poseidon([hash1, hash2]) -> final_hash
+ *
+ * @param modulusLimbs An array of 18 BigInts representing the 120-bit limbs of the RSA modulus.
+ * @param redcLimbs An array of 18 BigInts representing the 120-bit limbs of the RSA redc value.
+ * @returns A Promise resolving to a BigInt which is the final Poseidon hash.
+ */
+export async function hashRSAPublicKey(
+  modulusLimbs: bigint[],
+  redcLimbs: bigint[]
+): Promise<bigint> {
+  const NUM_TOTAL_LIMBS = 18;
+  const NUM_ELEMENTS_PER_POSEIDON_CHUNK = 9;
+  const BITS_PER_INPUT_LIMB = 120n; // Each limb in modulus/redc arrays is 120 bits
+  const SHIFT_VALUE_FOR_COMPOSITION = 2n ** BITS_PER_INPUT_LIMB;
+
+  if (
+    modulusLimbs.length !== NUM_TOTAL_LIMBS ||
+    redcLimbs.length !== NUM_TOTAL_LIMBS
+  ) {
+    throw new Error(
+      `Expected ${NUM_TOTAL_LIMBS} limbs for both modulus and redc, but received ${modulusLimbs.length} and ${redcLimbs.length}`
+    );
+  }
+
+  const poseidon = await buildPoseidon();
+
+  const chunk1_composed: bigint[] = [];
+  const chunk2_composed: bigint[] = [];
+
+  for (let i = 0; i < NUM_ELEMENTS_PER_POSEIDON_CHUNK; i++) {
+    // Compose elements for chunk1 from modulus limbs
+    const mod_limb_A = modulusLimbs[i * 2];
+    const mod_limb_B = modulusLimbs[i * 2 + 1];
+    chunk1_composed.push(mod_limb_A * SHIFT_VALUE_FOR_COMPOSITION + mod_limb_B);
+
+    // Compose elements for chunk2 from redc limbs
+    const redc_limb_A = redcLimbs[i * 2];
+    const redc_limb_B = redcLimbs[i * 2 + 1];
+    chunk2_composed.push(
+      redc_limb_A * SHIFT_VALUE_FOR_COMPOSITION + redc_limb_B
+    );
+  }
+
+  // Hash chunk1 (9 elements)
+  const hash_of_chunk1_raw = poseidon(chunk1_composed);
+  const hash_of_chunk1 = poseidon.F.toObject(hash_of_chunk1_raw);
+
+  // Hash chunk2 (9 elements)
+  const hash_of_chunk2_raw = poseidon(chunk2_composed);
+  const hash_of_chunk2 = poseidon.F.toObject(hash_of_chunk2_raw);
+
+  // Hash the two intermediate hashes ([hash1, hash2] - 2 elements)
+  const final_hash_inputs = [hash_of_chunk1, hash_of_chunk2];
+  const final_hash_raw = poseidon(final_hash_inputs);
+  const final_hash = poseidon.F.toObject(final_hash_raw);
+
+  return final_hash;
 }
