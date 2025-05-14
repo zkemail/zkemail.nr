@@ -45,6 +45,7 @@ global EMAIL_ADDRESS_CHAR_TABLE: [u8; 123] = [
  * @return - The blinded nullifier for the signature
  */
 pub fn blinded_nullifier<let KEY_LIMBS: u32>(signature: [Field; KEY_LIMBS], nonce: Field) -> Field {
+    // Safetfy: preimage is unconstrained
     let preimage = unsafe { __blinded_nullifier(signature, nonce) };
     for i in 0..KEY_LIMBS {
         assert(preimage[i] == signature[i], "Preimage does not contain signature");

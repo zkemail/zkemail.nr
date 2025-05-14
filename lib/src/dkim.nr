@@ -2,7 +2,7 @@ use crate::{KEY_LIMBS_1024, KEY_LIMBS_2048, RSA_EXPONENT};
 use bignum::{params::BigNumParams, RuntimeBigNum};
 use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
 use sha256::sha256_var;
-use std::hash::poseidon;
+use poseidon::poseidon;
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
     modulus: [Field; KEY_LIMBS],
