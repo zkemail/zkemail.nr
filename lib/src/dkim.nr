@@ -1,8 +1,8 @@
 use crate::{KEY_LIMBS_1024, KEY_LIMBS_2048, RSA_EXPONENT};
 use bignum::{params::BigNumParams, RuntimeBigNum};
+use poseidon::poseidon;
 use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
 use sha256::sha256_var;
-use std::hash::pedersen_hash;
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
     modulus: [Field; KEY_LIMBS],
@@ -57,7 +57,7 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         let modulus_hi = self.modulus[8] * 2.pow_32(120);
         dkim_preimage[8] = modulus_hi + self.redc[8];
         // hash the pubkey
-        pedersen_hash(dkim_preimage)
+        poseidon::bn254::hash_9(dkim_preimage)
     }
 
     pub fn validate_in_range(self) {
@@ -98,16 +98,21 @@ impl RSAPubkey<KEY_LIMBS_2048> {
     pub fn hash(self) -> Field {
         // validate range
         self.validate_in_range();
-        let mut dkim_preimage = [0; 18];
+        let mut chunk1 = [0; 9];
+        let mut chunk2 = [0; 9];
+
         // compose limbs
         for i in 0..9 {
             let modulus_hi = self.modulus[i * 2] * 2.pow_32(120);
             let redc_hi = self.redc[i * 2] * 2.pow_32(120);
-            dkim_preimage[i] = modulus_hi + self.modulus[i * 2 + 1];
-            dkim_preimage[i + 9] = redc_hi + self.redc[i * 2 + 1];
+            chunk1[i] = modulus_hi + self.modulus[i * 2 + 1];
+            chunk2[i] = redc_hi + self.redc[i * 2 + 1];
         }
-        // hash the pubkey
-        pedersen_hash(dkim_preimage)
+
+        let hash_of_chunk1 = poseidon::bn254::hash_9(chunk1);
+        let hash_of_chunk2 = poseidon::bn254::hash_9(chunk2);
+
+        poseidon::bn254::hash_2([hash_of_chunk1, hash_of_chunk2])
     }
 
     pub fn validate_in_range(self) {

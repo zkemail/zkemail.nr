@@ -2,13 +2,14 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { ZKEmailProver } from "../src/prover";
-import { generateEmailVerifierInputs }  from "../src/index";
+import { generateEmailVerifierInputs } from "../src/index";
 // import circuit1024 from "../../examples/verify_email_1024_bit_dkim/target/verify_email_1024_bit_dkim.json";
 import circuit2048 from "../../examples/verify_email_2048_bit_dkim/target/verify_email_2048_bit_dkim.json";
 import circuitPartialHash from "../../examples/partial_hash/target/partial_hash.json";
 import circuitEmailMask from "../../examples/email_mask/target/email_mask.json";
 import circuitExtractAddresses from "../../examples/extract_addresses/target/extract_addresses.json";
 import circuitRemoveSoftLineBreak from "../../examples/remove_soft_line_breaks/target/remove_soft_line_breaks.json";
+import { hashRSAPublicKey } from "../src/utils";
 
 const emails = {
   small: fs.readFileSync(path.join(__dirname, "./test-data/email-good.eml")),
@@ -41,9 +42,15 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
     //@ts-ignore
     proverMasked = new ZKEmailProver(circuitEmailMask, num_cpus);
     //@ts-ignore
-    proverExtractAddresses = new ZKEmailProver(circuitExtractAddresses, num_cpus);
+    proverExtractAddresses = new ZKEmailProver(
+      circuitExtractAddresses,
+      num_cpus
+    );
     //@ts-ignore
-    proverRemoveSoftLineBreak = new ZKEmailProver(circuitRemoveSoftLineBreak, num_cpus);
+    proverRemoveSoftLineBreak = new ZKEmailProver(
+      circuitRemoveSoftLineBreak,
+      num_cpus
+    );
   });
 
   afterAll(async () => {
@@ -66,7 +73,8 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
     });
     it("Partial Hash", async () => {
       const inputs = await generateEmailVerifierInputs(emails.large, {
-        shaPrecomputeSelector: "All nodes in the Bitcoin network can consult it",
+        shaPrecomputeSelector:
+          "All nodes in the Bitcoin network can consult it",
         maxHeadersLength: 512,
         maxBodyLength: 192,
       });
@@ -148,6 +156,19 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
         ...inputParams,
       });
       await proverRemoveSoftLineBreak.simulateWitness(inputs);
-    })
+    });
+    it("Hash RSAPublicKey", async () => {
+      const inputs = await generateEmailVerifierInputs(
+        emails.small,
+        inputParams
+      );
+      let modulus = inputs.pubkey.modulus.map((limb) => BigInt(limb));
+      let redc = inputs.pubkey.redc.map((limb) => BigInt(limb));
+      let computed_hash = await hashRSAPublicKey(modulus, redc);
+      const result = await prover2048.simulateWitness(inputs);
+      expect(result.returnValue[0].slice(2)).toEqual(
+        computed_hash.toString(16)
+      );
+    });
   });
 });
