@@ -39,7 +39,7 @@ use std::hash::{sha256_var, pedersen_hash};
   let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
   // compute the sha256 hash of the asserted body
   let computed_body_hash: [u8; 32] = sha256_var(body.storage, body.len() as u64);
-  // constain the computed body hash to match the one found in the header
+  // constrain, contain the computed body hash to match the one found in the header
   assert(
     signed_body_hash == computed_body_hash,
     "SHA256 hash computed over body does not match body hash found in DKIM-signed header"
@@ -69,7 +69,7 @@ use zkemail::{
   let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
   // finish the partial hash
   let computed_body_hash = partial_sha256_var_end(partial_body_hash, body.storage(), body.len() as u64, partial_body_real_length);   
-  // constain the computed body hash to match the one found in the header
+  // constrain, contain the computed body hash to match the one found in the header
   assert(
     signed_body_hash == computed_body_hash,
     "SHA256 hash computed over body does not match body hash found in DKIM-signed header"
