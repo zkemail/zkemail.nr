@@ -1,5 +1,6 @@
 [package]
-name = "zkemail.nr"
+name = "zkemail_nr"
+#name = "zkemail.nr"
 type = "lib"
 authors = ["Mach 34"]
 compiler_version = ">=1.0.0"
