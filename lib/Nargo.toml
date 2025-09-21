@@ -1,6 +1,6 @@
 [package]
-name = "zkemail_nr"
-#name = "zkemail.nr"
+name = "zkemail_nr"  # The modified package name - To avoid the 'Invalid package name' error in the ZK circuit, which the 'zkemail.nr' is integrated (NOTE: Noir/Nargo version v1.0.0-beta.11)
+#name = "zkemail.nr" # The original package name
 type = "lib"
 authors = ["Mach 34"]
 compiler_version = ">=1.0.0"
