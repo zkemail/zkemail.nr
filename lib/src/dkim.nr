@@ -98,46 +98,11 @@ impl RSAPubkey<KEY_LIMBS_2048> {
     pub fn hash(self) -> Field {
         // validate range
         self.validate_in_range();
+        // Build 17 contiguous 121-bit chunks from the 18 x 120-bit limbs
+        let chunks_121 = modulus_limbs_to_chunks_121(self.modulus);
 
-        // Reconstruct the modulus as 17 chunks of 121 bits (little-endian in chunks)
-        // Each 121-bit chunk c_j pulls lower (120 - j) bits from limb j (shifted right by j)
-        // and upper (1 + j) bits from limb j+1 (shifted left by 120 - j).
-        // This exactly partitions the 2048-bit modulus across 17 x 121-bit chunks.
-        let mut chunks_121 = [0; 17];
-        for j in 0..17 {
-            let a0: u128 = self.modulus[j] as u128;
-            let a1: u128 = if j + 1 < KEY_LIMBS_2048 {
-                self.modulus[j + 1] as u128
-            } else {
-                0
-            };
-
-            let shift_j: u32 = j;
-            let lower: u128 = a0 >> (shift_j as u8); // take lower (120 - j) bits contribution
-
-            let width_next: u32 = 1 + j; // bits taken from next limb
-            let high_mask: u128 = ((1 as u128) << (width_next as u8)) - (1 as u128);
-            let take_from_next: u128 = a1 & high_mask; // at most 17 bits
-
-            let left_shift: u32 = 120 - j; // place into high bits of the 121-bit chunk
-            let high: u128 = take_from_next << (left_shift as u8);
-
-            let chunk_val: u128 = lower + high; // fits within 121 bits
-            chunks_121[j] = chunk_val as Field;
-        }
-
-        // Merge pairs per PoseidonLarge template with bitsPerChunk = 121 and chunkSize = 17
-        // poseidonInput has size ceil(17 / 2) = 9
-        let base_121 = 2.pow_32(121);
-        let mut poseidon_input = [0; 9];
-        for i in 0..9 {
-            if i == 8 {
-                // last odd element
-                poseidon_input[i] = chunks_121[16];
-            } else {
-                poseidon_input[i] = chunks_121[2 * i] + base_121 * chunks_121[2 * i + 1];
-            }
-        }
+        // Merge pairs per PoseidonLarge template (17 -> 9 inputs)
+        let poseidon_input = merge_chunks_121_for_poseidon(chunks_121);
 
         poseidon::bn254::hash_9(poseidon_input)
     }
@@ -159,4 +124,53 @@ fn convert_field_to_u128<let KEY_LIMBS: u32>(signature: [Field; KEY_LIMBS]) -> [
         u128_signature[i] = signature[i] as u128;
     }
     u128_signature
+}
+
+// Compute 2^n as u128 (n is small: <= 121)
+fn pow2_u128(n: u32) -> u128 {
+    let mut result: u128 = 1;
+    for _ in 0..n {
+        result = result * 2;
+    }
+    result
+}
+
+// Build 17 contiguous 121-bit chunks from 18 x 120-bit limbs (little-endian)
+fn modulus_limbs_to_chunks_121(modulus: [Field; KEY_LIMBS_2048]) -> [Field; 17] {
+    let mut chunks_121 = [0; 17];
+    for j in 0..17 {
+        let a0: u128 = modulus[j] as u128;
+        let a1: u128 = if j + 1 < KEY_LIMBS_2048 {
+            modulus[j + 1] as u128
+        } else {
+            0
+        };
+
+        // Compute lower contribution: a0 >> j  => a0 / 2^j
+        let lower: u128 = a0 / pow2_u128(j);
+
+        // Mask for (1 + j) bits from next limb: (2^(1+j)) - 1
+        let high_mask: u128 = pow2_u128(1 + j) - 1;
+        let take_from_next: u128 = a1 & high_mask;
+
+        // Left shift by (120 - j): multiply by 2^(120 - j)
+        let high: u128 = take_from_next * pow2_u128(120 - j);
+
+        chunks_121[j] = (lower + high) as Field;
+    }
+    chunks_121
+}
+
+// Merge 17 x 121-bit chunks into 9 Poseidon inputs as per PoseidonLarge
+fn merge_chunks_121_for_poseidon(chunks_121: [Field; 17]) -> [Field; 9] {
+    let base_121 = 2.pow_32(121);
+    let mut input = [0; 9];
+    for i in 0..9 {
+        if i == 8 {
+            input[i] = chunks_121[16];
+        } else {
+            input[i] = chunks_121[2 * i] + base_121 * chunks_121[2 * i + 1];
+        }
+    }
+    input
 }
