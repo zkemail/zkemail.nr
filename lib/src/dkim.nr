@@ -95,6 +95,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         header_hash
     }
 
+    // compatible with https://github.com/zkemail/zk-email-verify/blob/62dd54871857697a6f2fb9c0a8ea72e38c7eb293/packages/circuits/utils/hash.circom#L15
     pub fn hash(self) -> Field {
         // validate range
         self.validate_in_range();
