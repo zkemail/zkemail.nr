@@ -1,5 +1,6 @@
 [package]
-name = "zkemail.nr"
+name = "zkemail_nr"  # The modified package name - To avoid the 'Invalid package name' error in the ZK circuit, which the 'zkemail.nr' is integrated (NOTE: Noir/Nargo version v1.0.0-beta.11)
+#name = "zkemail.nr" # The original package name
 type = "lib"
 authors = ["Mach 34"]
 compiler_version = ">=1.0.0"
@@ -8,6 +9,6 @@ compiler_version = ">=1.0.0"
 bignum = { tag = "v0.6.0", git = "https://github.com/noir-lang/noir-bignum" }
 rsa = { tag = "v0.7.0", git = "https://github.com/noir-lang/noir_rsa" }
 base64 = { tag = "v0.4.0", git = "https://github.com/noir-lang/noir_base64" }
-nodash = { tag = "v0.40.2", git = "https://github.com/olehmisar/nodash" }
+nodash = { tag = "v0.41.1", git = "https://github.com/olehmisar/nodash" }
 sha256 = { git = "https://github.com/noir-lang/sha256", tag = "v0.1.2" }
 poseidon = { tag = "v0.1.0", git = "https://github.com/noir-lang/poseidon" }
