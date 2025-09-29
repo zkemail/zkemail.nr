@@ -150,71 +150,69 @@ export function makeEmailAddressCharTable(): string {
 }
 
 /**
- * Hashes an RSA public key (modulus and redc limbs) using a hierarchical Poseidon scheme,
- * mirroring the logic in zkemail.nr's RSAPubkey<KEY_LIMBS_2048>::hash function.
+ * Hash an RSA public key by converting 18 x 120-bit limbs into 17 x 121-bit chunks (modulus-only),
+ * mirroring Noir RSAPubkey<2048>::hash.
  *
- * The process is:
- * 1. Modulus and Redc are each provided as 18 x 120-bit limbs.
- * 2. Two 'chunks' of 9 elements each are formed:
- *    - chunk1_element[i] = modulus_limb[2i] * 2^120 + modulus_limb[2i+1]
- *    - chunk2_element[i] = redc_limb[2i] * 2^120 + redc_limb[2i+1]
- * 3. Poseidon(chunk1) -> hash1
- * 4. Poseidon(chunk2) -> hash2
- * 5. Poseidon([hash1, hash2]) -> final_hash
+ * Process:
+ * - Inputs are 18 limbs of 120 bits for the modulus and redc (redc unused in hashing).
+ * - Build 17 contiguous 121-bit chunks from the 18 x 120-bit modulus limbs.
+ * - Merge pairs of 121-bit chunks into 8 elements using base 2^121; keep the last chunk as the 9th element:
+ *   input[i] = chunk[2i] + chunk[2i+1] * 2^121, for i in 0..7
+ *   input[8] = chunk[16]
+ * - Poseidon(input[0..8]) -> final hash
  *
- * @param modulusLimbs An array of 18 BigInts representing the 120-bit limbs of the RSA modulus.
- * @param redcLimbs An array of 18 BigInts representing the 120-bit limbs of the RSA redc value.
- * @returns A Promise resolving to a BigInt which is the final Poseidon hash.
+ * @param modulusLimbs 18 BigInts (each <= 120 bits) representing the RSA modulus limbs
+ * @param redcLimbs 18 BigInts (unused in hashing; kept for backward compatibility)
+ * @returns Final Poseidon hash as a BigInt
  */
 export async function hashRSAPublicKey(
   modulusLimbs: bigint[],
   redcLimbs: bigint[]
 ): Promise<bigint> {
-  const NUM_TOTAL_LIMBS = 18;
-  const NUM_ELEMENTS_PER_POSEIDON_CHUNK = 9;
-  const BITS_PER_INPUT_LIMB = 120n; // Each limb in modulus/redc arrays is 120 bits
-  const SHIFT_VALUE_FOR_COMPOSITION = 2n ** BITS_PER_INPUT_LIMB;
+  const NUM_INPUT_LIMBS_120 = 18; // 18 x 120-bit limbs
+  const NUM_CHUNKS_121 = 17; // produce 17 contiguous 121-bit chunks
+  const NUM_POSEIDON_INPUTS = 9;
+  const BASE_121 = 1n << 121n;
 
   if (
-    modulusLimbs.length !== NUM_TOTAL_LIMBS ||
-    redcLimbs.length !== NUM_TOTAL_LIMBS
+    modulusLimbs.length !== NUM_INPUT_LIMBS_120 ||
+    redcLimbs.length !== NUM_INPUT_LIMBS_120
   ) {
     throw new Error(
-      `Expected ${NUM_TOTAL_LIMBS} limbs for both modulus and redc, but received ${modulusLimbs.length} and ${redcLimbs.length}`
+      `Expected ${NUM_INPUT_LIMBS_120} limbs for both modulus and redc, but received ${modulusLimbs.length} and ${redcLimbs.length}`
     );
   }
 
   const poseidon = await buildPoseidon();
 
-  const chunk1_composed: bigint[] = [];
-  const chunk2_composed: bigint[] = [];
+  // Step 1: Build 17 contiguous 121-bit chunks from 18 x 120-bit limbs
+  const chunks121: bigint[] = new Array(NUM_CHUNKS_121).fill(0n);
+  for (let j = 0; j < NUM_CHUNKS_121; j++) {
+    const a0 = modulusLimbs[j];
+    const a1 = j + 1 < NUM_INPUT_LIMBS_120 ? modulusLimbs[j + 1] : 0n;
 
-  for (let i = 0; i < NUM_ELEMENTS_PER_POSEIDON_CHUNK; i++) {
-    // Compose elements for chunk1 from modulus limbs
-    const mod_limb_A = modulusLimbs[i * 2];
-    const mod_limb_B = modulusLimbs[i * 2 + 1];
-    chunk1_composed.push(mod_limb_A * SHIFT_VALUE_FOR_COMPOSITION + mod_limb_B);
+    const shiftLow = BigInt(j);
+    const lower = a0 >> shiftLow; // a0 / 2^j
 
-    // Compose elements for chunk2 from redc limbs
-    const redc_limb_A = redcLimbs[i * 2];
-    const redc_limb_B = redcLimbs[i * 2 + 1];
-    chunk2_composed.push(
-      redc_limb_A * SHIFT_VALUE_FOR_COMPOSITION + redc_limb_B
-    );
+    const maskBits = 1n + BigInt(j); // (1 + j)
+    const highMask = (1n << maskBits) - 1n; // (2^(1+j)) - 1
+    const takeFromNext = a1 & highMask;
+
+    const leftShift = BigInt(120 - j);
+    const high = takeFromNext << leftShift; // * 2^(120 - j)
+
+    chunks121[j] = lower + high;
   }
 
-  // Hash chunk1 (9 elements)
-  const hash_of_chunk1_raw = poseidon(chunk1_composed);
-  const hash_of_chunk1 = poseidon.F.toObject(hash_of_chunk1_raw);
+  // Step 2: Merge into 9 Poseidon inputs: for i in 0..7: chunks[2i] + base * chunks[2i+1], last is chunks[16]
+  const poseidonInputs: bigint[] = new Array(NUM_POSEIDON_INPUTS);
+  for (let i = 0; i < 8; i++) {
+    poseidonInputs[i] = chunks121[2 * i] + BASE_121 * chunks121[2 * i + 1];
+  }
+  poseidonInputs[8] = chunks121[16];
 
-  // Hash chunk2 (9 elements)
-  const hash_of_chunk2_raw = poseidon(chunk2_composed);
-  const hash_of_chunk2 = poseidon.F.toObject(hash_of_chunk2_raw);
+  const finalHashRaw = poseidon(poseidonInputs);
+  const finalHash = poseidon.F.toObject(finalHashRaw);
 
-  // Hash the two intermediate hashes ([hash1, hash2] - 2 elements)
-  const final_hash_inputs = [hash_of_chunk1, hash_of_chunk2];
-  const final_hash_raw = poseidon(final_hash_inputs);
-  const final_hash = poseidon.F.toObject(final_hash_raw);
-
-  return final_hash;
+  return finalHash;
 }
