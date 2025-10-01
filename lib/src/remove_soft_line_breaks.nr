@@ -1,6 +1,6 @@
 use crate::{CR, LF};
 use nodash::pack_bytes;
-use poseidon::poseidon;
+use poseidon::poseidon2::Poseidon2;
 
 /**
  * Computes R by packing bytes into fields before hashing to reduce the work
@@ -17,12 +17,7 @@ fn compressed_r<let N: u32>(encoded: [u8; N], decoded: [u8; N]) -> Field {
         input[i] = encoded_packed[i];
         input[i + N / 31 + 1] = decoded_packed[i];
     }
-    // For N=32, this will be a 4-element array, so use hash_4
-    // Convert to fixed size array for poseidon
-    let input_size = 2 * (N / 31 + 1);
-    assert(input_size == 4, "compressed_r expects N=32, resulting in 4 Field elements");
-    let input_fixed: [Field; 4] = [input[0], input[1], input[2], input[3]];
-    poseidon::bn254::hash_4(input_fixed)
+    Poseidon2::hash(input, input.len())
 }
 
 /**
