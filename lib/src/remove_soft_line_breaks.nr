@@ -1,6 +1,23 @@
 use crate::{CR, LF};
-use nodash::array::pack_bytes;
-use std::hash::poseidon2::Poseidon2;
+use poseidon::poseidon;
+
+/**
+ * Pack bytes into fields (31 bytes per field to avoid overflow)
+ */
+fn pack_bytes<let N: u32>(bytes: [u8; N]) -> [Field; N / 31 + 1] {
+    let mut result: [Field; N / 31 + 1] = [0; N / 31 + 1];
+    for i in 0..(N / 31 + 1) {
+        let mut field_value: Field = 0;
+        for j in 0..31 {
+            let byte_index = i * 31 + j;
+            if byte_index < N {
+                field_value = field_value * 256 + bytes[byte_index] as Field;
+            }
+        }
+        result[i] = field_value;
+    }
+    result
+}
 
 /**
  * Computes R by packing bytes into fields before hashing to reduce the work
@@ -17,7 +34,12 @@ fn compressed_r<let N: u32>(encoded: [u8; N], decoded: [u8; N]) -> Field {
         input[i] = encoded_packed[i];
         input[i + N / 31 + 1] = decoded_packed[i];
     }
-    Poseidon2::hash(input, input.len())
+    // For N=32, this will be a 4-element array, so use hash_4
+    // Convert to fixed size array for poseidon
+    let input_size = 2 * (N / 31 + 1);
+    assert(input_size == 4, "compressed_r expects N=32, resulting in 4 Field elements");
+    let input_fixed: [Field; 4] = [input[0], input[1], input[2], input[3]];
+    poseidon::bn254::hash_4(input_fixed)
 }
 
 /**
@@ -36,10 +58,10 @@ pub fn find_zeroes<let N: u32>(encoded: [u8; N]) -> [bool; N] {
     // find indexes of chars to zero
     let mut should_zero: [bool; N] = [false; N];
     should_zero[0] = is_break[0];
-    should_zero[1] = is_break[1] + is_break[0];
+    should_zero[1] = is_break[1] | is_break[0];
     should_zero[N - 1] = is_break[N - 3];
     for i in 2..N - 1 {
-        should_zero[i] = is_break[i] + is_break[i - 1] + is_break[i - 2];
+        should_zero[i] = is_break[i] | is_break[i - 1] | is_break[i - 2];
     }
 
     should_zero
