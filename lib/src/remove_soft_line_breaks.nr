@@ -1,23 +1,6 @@
 use crate::{CR, LF};
+use nodash::pack_bytes;
 use poseidon::poseidon;
-
-/**
- * Pack bytes into fields (31 bytes per field to avoid overflow)
- */
-fn pack_bytes<let N: u32>(bytes: [u8; N]) -> [Field; N / 31 + 1] {
-    let mut result: [Field; N / 31 + 1] = [0; N / 31 + 1];
-    for i in 0..(N / 31 + 1) {
-        let mut field_value: Field = 0;
-        for j in 0..31 {
-            let byte_index = i * 31 + j;
-            if byte_index < N {
-                field_value = field_value * 256 + bytes[byte_index] as Field;
-            }
-        }
-        result[i] = field_value;
-    }
-    result
-}
 
 /**
  * Computes R by packing bytes into fields before hashing to reduce the work
