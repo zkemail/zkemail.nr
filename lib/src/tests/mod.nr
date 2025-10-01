@@ -266,22 +266,21 @@ mod header_field_access {
                 + EmailLarge::DKIM_HEADER_SEQUENCE.length
                 + 2, // 2 for crlf in middle
         };
-        // add initial crlf
+        // add initial crlf (before sequence starts at index 2)
         tampered_header.push(13);
         tampered_header.push(10);
-        // copy dkim-signature field
-        for i in 0..EmailLarge::DKIM_HEADER_SEQUENCE.length + 2 {
-            tampered_header.push(EmailLarge::HEADER.get(
-                EmailLarge::DKIM_HEADER_SEQUENCE.index + i - 2,
-            ));
+        // copy dkim-signature field content only (without surrounding CRLFs)
+        for i in 0..EmailLarge::DKIM_HEADER_SEQUENCE.length {
+            tampered_header.push(EmailLarge::HEADER.get(EmailLarge::DKIM_HEADER_SEQUENCE.index + i));
         }
+        // add crlf in middle (this is the newline that should trigger the error)
         tampered_header.push("\r".as_bytes()[0]);
         tampered_header.push("\n".as_bytes()[0]);
-        // copy to field
-        for i in 0..EmailLarge::TO_HEADER_SEQUENCE.length + 2 {
+        // copy to field content only (without surrounding CRLFs)
+        for i in 0..EmailLarge::TO_HEADER_SEQUENCE.length {
             tampered_header.push(EmailLarge::HEADER.get(EmailLarge::TO_HEADER_SEQUENCE.index + i));
         }
-        // set crlf at end
+        // add crlf at end (at position index + length)
         tampered_header.push("\r".as_bytes()[0]);
         tampered_header.push("\n".as_bytes()[0]);
         let tampered_body_hash_index = 93; // just manually setting this
