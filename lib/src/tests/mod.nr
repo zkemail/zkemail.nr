@@ -131,7 +131,9 @@ mod test_tampered_hash {
 
 mod header_field_access {
 
-    use crate::{CR, LF, headers::body_hash::get_body_hash, Sequence, tests::test_inputs::EmailLarge};
+    use crate::{
+        CR, headers::body_hash::get_body_hash, LF, Sequence, tests::test_inputs::EmailLarge,
+    };
 
     #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
     fn test_bad_body_hash_off_one_minus() {
