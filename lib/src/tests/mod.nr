@@ -131,7 +131,7 @@ mod test_tampered_hash {
 
 mod header_field_access {
 
-    use crate::{headers::body_hash::get_body_hash, Sequence, tests::test_inputs::EmailLarge};
+    use crate::{CR, LF, headers::body_hash::get_body_hash, Sequence, tests::test_inputs::EmailLarge};
 
     #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
     fn test_bad_body_hash_off_one_minus() {
@@ -267,22 +267,22 @@ mod header_field_access {
                 + 2, // 2 for crlf in middle
         };
         // add initial crlf (before sequence starts at index 2)
-        tampered_header.push(13);
-        tampered_header.push(10);
+        tampered_header.push(CR);
+        tampered_header.push(LF);
         // copy dkim-signature field content only (without surrounding CRLFs)
         for i in 0..EmailLarge::DKIM_HEADER_SEQUENCE.length {
             tampered_header.push(EmailLarge::HEADER.get(EmailLarge::DKIM_HEADER_SEQUENCE.index + i));
         }
         // add crlf in middle (this is the newline that should trigger the error)
-        tampered_header.push("\r".as_bytes()[0]);
-        tampered_header.push("\n".as_bytes()[0]);
+        tampered_header.push(CR);
+        tampered_header.push(LF);
         // copy to field content only (without surrounding CRLFs)
         for i in 0..EmailLarge::TO_HEADER_SEQUENCE.length {
             tampered_header.push(EmailLarge::HEADER.get(EmailLarge::TO_HEADER_SEQUENCE.index + i));
         }
         // add crlf at end (at position index + length)
-        tampered_header.push("\r".as_bytes()[0]);
-        tampered_header.push("\n".as_bytes()[0]);
+        tampered_header.push(CR);
+        tampered_header.push(LF);
         let tampered_body_hash_index = 93; // just manually setting this
         // attempt to get body hash
         let _ = get_body_hash(tampered_header, combined_sequence, tampered_body_hash_index);
