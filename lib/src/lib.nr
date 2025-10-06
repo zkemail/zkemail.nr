@@ -4,6 +4,7 @@ pub mod headers;
 pub mod masking;
 pub mod partial_hash;
 pub mod remove_soft_line_breaks;
+pub mod hash;
 pub mod utils;
 mod tests;
 
