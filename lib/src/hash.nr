@@ -1,4 +1,12 @@
 use crate::KEY_LIMBS_2048;
+use poseidon::poseidon;
+
+// Hash 18 x 120-bit limbs into a single Field - compatible with https://github.com/zkemail/zk-email-verify/blob/62dd54871857697a6f2fb9c0a8ea72e38c7eb293/packages/circuits/utils/hash.circom#L15
+pub fn poseidon_large(limbs120x18: [Field; KEY_LIMBS_2048]) -> Field {
+    let limbs121x17 = limbs120x18_to_limbs121x17(limbs120x18);
+    let poseidon_input = fold_limbs121(limbs121x17);
+    poseidon::bn254::hash_9(poseidon_input)
+}
 
 // Compute 2^n as u128 (n is small: <= 121)
 fn pow2_u128(n: u32) -> u128 {

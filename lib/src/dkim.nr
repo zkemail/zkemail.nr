@@ -1,9 +1,4 @@
-use crate::{
-    hash::{fold_limbs121, limbs120x18_to_limbs121x17},
-    KEY_LIMBS_1024,
-    KEY_LIMBS_2048,
-    RSA_EXPONENT,
-};
+use crate::{hash::poseidon_large, KEY_LIMBS_1024, KEY_LIMBS_2048, RSA_EXPONENT};
 use bignum::{params::BigNumParams, RuntimeBigNum};
 use poseidon::poseidon;
 use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
@@ -100,17 +95,10 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         header_hash
     }
 
-    // compatible with https://github.com/zkemail/zk-email-verify/blob/62dd54871857697a6f2fb9c0a8ea72e38c7eb293/packages/circuits/utils/hash.circom#L15
     pub fn hash(self) -> Field {
         // validate range
         self.validate_in_range();
-        // Build 17 contiguous 121-bit limbs from the 18 x 120-bit limbs
-        let limbs121 = limbs120x18_to_limbs121x17(self.modulus);
-
-        // Merge pairs per PoseidonLarge template (17 -> 9 inputs)
-        let poseidon_input = fold_limbs121(limbs121);
-
-        poseidon::bn254::hash_9(poseidon_input)
+        poseidon_large(self.modulus)
     }
 
     pub fn validate_in_range(self) {
