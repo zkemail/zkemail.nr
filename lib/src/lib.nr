@@ -8,8 +8,6 @@ pub mod hash;
 pub mod utils;
 mod tests;
 
-pub use crate::hash::poseidon_large;
-
 global RSA_EXPONENT: u32 = 65537;
 global KEY_LIMBS_1024: u32 = 9;
 global KEY_LIMBS_2048: u32 = 18;
