@@ -4,7 +4,7 @@ use poseidon::poseidon;
 // Hash 18 x 120-bit limbs into a single Field - compatible with https://github.com/zkemail/zk-email-verify/blob/62dd54871857697a6f2fb9c0a8ea72e38c7eb293/packages/circuits/utils/hash.circom#L15
 pub fn poseidon_large(limbs120x18: [Field; KEY_LIMBS_2048]) -> Field {
     let limbs121x17 = limbs120x18_to_limbs121x17(limbs120x18);
-    let poseidon_input = fold_limbs121(limbs121x17);
+    let poseidon_input = fold_limbs121::<17, 9>(limbs121x17);
     poseidon::bn254::hash_9(poseidon_input)
 }
 
@@ -48,6 +48,7 @@ pub fn fold_limbs121<let K: u32, let K_out: u32>(limbs121: [Field; K]) -> [Field
     assert(K >= 2, "K must be >= 2");
     assert(K_out >= 1, "K_out must be >= 1");
     assert(K_out <= K, "K_out must be <= K");
+    assert(2 * K_out <= K + 1, "K_out must satisfy 2*K_out <= K + 1");
 
     let base_121 = 2.pow_32(121);
     let mut input = [0; K_out];
