@@ -20,6 +20,7 @@ import {
 } from "./utils";
 
 export { verifyDKIMSignature } from "@zk-email/helpers/dist/dkim";
+export { hashRSAPublicKey } from "./utils";
 
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
 // modified for noir input generation

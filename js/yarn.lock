@@ -1631,18 +1631,6 @@
   dependencies:
     "@noir-lang/types" "1.0.0-beta.5"
 
-"@noir-lang/noirc_abi@^1.0.0-beta.5":
-  version "1.0.0-beta.14"
-  resolved "https://registry.yarnpkg.com/@noir-lang/noirc_abi/-/noirc_abi-1.0.0-beta.14.tgz#87cc771e0616c2ab695c0125cade991a20c44326"
-  integrity sha512-iqYrvngdgqE4KLuvU5HySVztcNrvWvvMr4txl/TrrXjPcedeacpw4FSBFDN7807YEu+oL0qhwZRvTnB8D3ZJFg==
-  dependencies:
-    "@noir-lang/types" "1.0.0-beta.14"
-
-"@noir-lang/types@1.0.0-beta.14":
-  version "1.0.0-beta.14"
-  resolved "https://registry.yarnpkg.com/@noir-lang/types/-/types-1.0.0-beta.14.tgz#66f5f25d70c14da3604e8e26e8f06cea175ab7e0"
-  integrity sha512-JulPw/DQEhJIucrVjx8Cja82C8GJCYHuEWfWZmbNATa9QfujWe0NAibpRgcaPMXnJGId4ppaTLlOlMOs2khYNQ==
-
 "@noir-lang/types@1.0.0-beta.5":
   version "1.0.0-beta.5"
   resolved "https://registry.yarnpkg.com/@noir-lang/types/-/types-1.0.0-beta.5.tgz#0b4eb708f863d54f5d05954d028ccf99c862e188"
