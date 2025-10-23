@@ -21,7 +21,7 @@ fmt() {
 # Check the versions of Noir and BB
 check_versions
 
-cd $SCRIPT_DIR/..
+cd "$SCRIPT_DIR/.." || { echo "Failed to change directory to $SCRIPT_DIR/.." >&2; exit 1; }
 
 # Loop over every child folder in the examples directory
 for folder in ./examples/*/; do
@@ -31,4 +31,5 @@ for folder in ./examples/*/; do
 done
 
 # Format the main library
-cd lib && nargo fmt
+cd "lib" || { echo "Failed to change directory to lib" >&2; exit 1; }
+nargo fmt

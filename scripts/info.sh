@@ -26,7 +26,7 @@ get_circuit_size() {
 # Check the versions of Noir and BB
 check_versions
 
-cd $SCRIPT_DIR/../examples
+cd "$SCRIPT_DIR/../examples" || { echo "Failed to change directory to $SCRIPT_DIR/../examples" >&2; exit 1; }
 
 # Loop over every child folder in the examples directory
 for folder in *; do
@@ -34,4 +34,4 @@ for folder in *; do
         get_circuit_size "$folder"
     fi
 done
-cd ..
+cd ".." || { echo "Failed to change directory to .." >&2; exit 1; }
