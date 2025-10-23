@@ -1,20 +1,8 @@
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
-NARGO_VERSION="1.0.0-beta.5"
-BB_VERSION="0.84.0"
-
-check_versions() {
-    if [ "$(nargo --version | grep "nargo version = $NARGO_VERSION")" != "nargo version = $NARGO_VERSION" ]; then
-        echo "Noir version is not $NARGO_VERSION, running noirup --version $NARGO_VERSION"
-        noirup --version $NARGO_VERSION
-    fi
-
-    if [ "$(bb --version)" != "v$BB_VERSION" ]; then
-        echo "BB version is not $BB_VERSION, running bbup --version $BB_VERSION"
-        bbup --version $BB_VERSION
-    fi
-}
+# Source the common script with version variables and check_versions function
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 compile_example() {
     project=$1
