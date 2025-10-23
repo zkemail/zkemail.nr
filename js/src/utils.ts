@@ -79,8 +79,7 @@ export function getHeaderSequence(
       .toLowerCase()}:.*(?:\r?\n)?`
   );
   const match = header.toString().match(regex);
-  if (match === null)
-    throw new Error(`Field "${headerField}" not found in header`);
+  if (match === null) throw new Error(`Field "${headerField}" not found in header`);
   return {
     index: match.index!.toString(),
     length: match[0].length.toString(),
@@ -104,10 +103,8 @@ export function getAddressHeaderSequence(header: Buffer, headerField: string) {
   );
   const headerStr = header.toString();
   const match = headerStr.match(regex);
-  if (match === null)
-    throw new Error(`Field "${headerField}" not found in header`);
-  if (match[1] === null && match[2] === null)
-    throw new Error(`Address not found in "${headerField}" field`);
+  if (match === null) throw new Error(`Field "${headerField}" not found in header`);
+  if (match[1] === null && match[2] === null) throw new Error(`Address not found in "${headerField}" field`);
   const address = match[1] || match[2];
   const addressIndex = headerStr.indexOf(address);
   return [

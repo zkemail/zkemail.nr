@@ -1,6 +1,9 @@
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
+# Source the common script with version variables and check_versions function
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
 get_circuit_size() {
     project=$1
     
@@ -20,11 +23,15 @@ get_circuit_size() {
     popd > /dev/null
 }
 
-cd $SCRIPT_DIR/../examples
+# Check the versions of Noir and BB
+check_versions
+
+cd "$SCRIPT_DIR/../examples" || { echo "Failed to change directory to $SCRIPT_DIR/../examples" >&2; exit 1; }
+
 # Loop over every child folder in the examples directory
 for folder in *; do
     if [ -d "$folder" ]; then
         get_circuit_size "$folder"
     fi
 done
-cd ..
+cd ".." || { echo "Failed to change directory to .." >&2; exit 1; }
