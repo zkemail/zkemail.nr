@@ -75,7 +75,6 @@ export type InputGenerationArgs = {
   removeSoftLineBreaks?: boolean;
   headerMask?: number[];
   bodyMask?: number[];
-  // todo: probably move these out into a separate extended type?
   extractFrom?: boolean;
   extractTo?: boolean;
 };
