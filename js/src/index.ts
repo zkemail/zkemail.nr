@@ -25,8 +25,7 @@ export { hashRSAPublicKey } from "./utils";
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
 // modified for noir input generation
 
-export type CircuitInput = {
-  // required inputs for all zkemail verifications
+export type BaseCircuitInput = {
   header: BoundedVec;
   pubkey: {
     modulus: string[];
@@ -34,22 +33,38 @@ export type CircuitInput = {
   };
   signature: string[];
   dkim_header_sequence: Sequence;
-  // inputs used for verifying full or partial hash
-  body?: BoundedVec;
-  body_hash_index?: string;
-  // inputs used for only partial hash
-  partial_body_real_length?: string;
-  partial_body_hash?: string[];
-  // inputs used for only masking
-  header_mask?: string[];
-  body_mask?: string[];
-  // input for decoded body
-  decoded_body?: BoundedVec;
-  // inputs used for address extraction
-  from_header_sequence?: Sequence;
-  from_address_sequence?: Sequence;
-  to_header_sequence?: Sequence;
-  to_address_sequence?: Sequence;
+};
+
+export type BodyInput = {
+  body: BoundedVec;
+  body_hash_index: string;
+};
+
+export type PartialSHAInput = {
+  partial_body_real_length: string;
+  partial_body_hash: string[];
+};
+
+export type HeaderMaskInput = {
+  header_mask: string[];
+};
+
+export type BodyMaskInput = {
+  body_mask: string[];
+};
+
+export type DecodedBodyInput = {
+  decoded_body: BoundedVec;
+};
+
+export type ExtractFromInput = {
+  from_header_sequence: Sequence;
+  from_address_sequence: Sequence;
+};
+
+export type ExtractToInput = {
+  to_header_sequence: Sequence;
+  to_address_sequence: Sequence;
 };
 
 export type InputGenerationArgs = {
@@ -64,6 +79,26 @@ export type InputGenerationArgs = {
   extractFrom?: boolean;
   extractTo?: boolean;
 };
+
+export type EmailVerifierInputs<T extends InputGenerationArgs> = BaseCircuitInput &
+  (T["ignoreBodyHashCheck"] extends true
+    ? {}
+    : BodyInput &
+        (T["shaPrecomputeSelector"] extends string ? PartialSHAInput : {})
+        & (T["headerMask"] extends number[] ? HeaderMaskInput : {})
+        & (T["bodyMask"] extends number[] ? BodyMaskInput : {})
+        & (T["removeSoftLineBreaks"] extends true ? DecodedBodyInput : {})
+        & (T["extractFrom"] extends true ? ExtractFromInput : {})
+        & (T["extractTo"] extends true ? ExtractToInput : {}));
+
+export type CircuitInput = BaseCircuitInput &
+  Partial<BodyInput> &
+  Partial<PartialSHAInput> &
+  Partial<HeaderMaskInput> &
+  Partial<BodyMaskInput> &
+  Partial<DecodedBodyInput> &
+  Partial<ExtractFromInput> &
+  Partial<ExtractToInput>;
 
 /** Formatted for BoundedVec in case used in other places */
 function removeSoftLineBreaks(body: BoundedVec): BoundedVec {
@@ -102,10 +137,10 @@ function removeSoftLineBreaks(body: BoundedVec): BoundedVec {
  * @param params Arguments to control the input generation
  * @returns Circuit inputs for the EmailVerifier circuit
  */
-export async function generateEmailVerifierInputs(
+export async function generateEmailVerifierInputs<T extends InputGenerationArgs = {}>(
   rawEmail: Buffer | string,
-  params: InputGenerationArgs = {}
-) {
+  params?: T
+): Promise<EmailVerifierInputs<T>> {
   const dkimResult = await verifyDKIMSignature(rawEmail, undefined, undefined, true);
 
   return generateEmailVerifierInputsFromDKIMResult(dkimResult, params);
@@ -117,16 +152,17 @@ export async function generateEmailVerifierInputs(
  * @param params Arguments to control the input generation
  * @returns Circuit inputs for the EmailVerifier circuit
  */
-export function generateEmailVerifierInputsFromDKIMResult(
+export function generateEmailVerifierInputsFromDKIMResult<T extends InputGenerationArgs = {}>(
   dkimResult: DKIMVerificationResult,
-  params: InputGenerationArgs = {}
-): CircuitInput {
+  params?: T
+): EmailVerifierInputs<T> {
   const { headers, body, bodyHash, publicKey, signature, modulusLength } = dkimResult;
+  const _params: InputGenerationArgs = params || {};
 
   // SHA add padding
   const [messagePadded] = sha256Pad(
     headers,
-    params.maxHeadersLength || MAX_HEADER_PADDED_BYTES
+    _params.maxHeadersLength || MAX_HEADER_PADDED_BYTES
   );
 
   // set inputs used in all cases
@@ -144,9 +180,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
     dkim_header_sequence: getHeaderSequence(headers, "dkim-signature"),
   };
 
-  // removed: header mask
-
-  if (!params.ignoreBodyHashCheck) {
+  if (!_params.ignoreBodyHashCheck) {
     if (!body || !bodyHash) {
       throw new Error(
         "body and bodyHash are required when ignoreBodyHashCheck is false"
@@ -154,7 +188,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
     }
 
     const bodyHashIndex = headers.toString().indexOf(bodyHash);
-    const maxBodyLength = params.maxBodyLength || MAX_BODY_PADDED_BYTES;
+    const maxBodyLength = _params.maxBodyLength || MAX_BODY_PADDED_BYTES;
 
     // 65 comes from the 64 at the end and the 1 bit in the start, then 63 comes from the formula to round it up to the nearest 64.
     // see sha256algorithm.com for a more full explanation of padding length
@@ -168,7 +202,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
       {
         body: bodyPadded,
         bodyLength: bodyPaddedLen,
-        selectorString: params.shaPrecomputeSelector,
+        selectorString: _params.shaPrecomputeSelector,
         maxRemainingBodyLength: maxBodyLength,
       }
     );
@@ -177,7 +211,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
     let { bodyRemaining } = rest;
     // idk why this gets out of sync, todo: fix
     if (
-      params.shaPrecomputeSelector &&
+      _params.shaPrecomputeSelector &&
       bodyRemaining.length !== bodyRemainingLength
     ) {
       bodyRemaining = bodyRemaining.slice(0, bodyRemainingLength);
@@ -189,9 +223,9 @@ export function generateEmailVerifierInputsFromDKIMResult(
     };
     circuitInputs.body_hash_index = bodyHashIndex.toString();
 
-    if (params.shaPrecomputeSelector) {
+    if (_params.shaPrecomputeSelector) {
       // can use exact body lengths
-      const selector = new TextEncoder().encode(params.shaPrecomputeSelector);
+      const selector = new TextEncoder().encode(_params.shaPrecomputeSelector);
       const selectorIndex = findIndexInUint8Array(body, selector);
       const shaCutoffIndex = Math.floor(selectorIndex / 64) * 64;
       const remainingBodyLength = body.length - shaCutoffIndex;
@@ -205,26 +239,26 @@ export function generateEmailVerifierInputsFromDKIMResult(
     }
 
     // masking
-    if (params.headerMask) circuitInputs.header_mask = params.headerMask.map((x) => x.toString());
-    if (params.bodyMask) circuitInputs.body_mask = params.bodyMask.map((x) => x.toString());
+    if (_params.headerMask) circuitInputs.header_mask = _params.headerMask.map((x) => x.toString());
+    if (_params.bodyMask) circuitInputs.body_mask = _params.bodyMask.map((x) => x.toString());
 
     // remove soft line breaks
-    if (params.removeSoftLineBreaks) {
-      circuitInputs.decoded_body = removeSoftLineBreaks(circuitInputs.body);
+    if (_params.removeSoftLineBreaks) {
+      circuitInputs.decoded_body = removeSoftLineBreaks(circuitInputs.body!);
     }
 
     // address extraction
-    if (params.extractFrom) {
+    if (_params.extractFrom) {
       const fromSequences = getAddressHeaderSequence(headers, "from");
       circuitInputs.from_header_sequence = fromSequences[0];
       circuitInputs.from_address_sequence = fromSequences[1];
     }
-    if (params.extractTo) {
+    if (_params.extractTo) {
       const toSequences = getAddressHeaderSequence(headers, "to");
       circuitInputs.to_header_sequence = toSequences[0];
       circuitInputs.to_address_sequence = toSequences[1];
     }
   }
 
-  return circuitInputs;
+  return circuitInputs as EmailVerifierInputs<T>;
 }
