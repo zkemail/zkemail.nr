@@ -95,10 +95,10 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         header_hash
     }
 
-    pub fn hash(self) -> Field {
+    pub fn hash(self) -> [Field; 2] {
         // validate range
         self.validate_in_range();
-        poseidon_large(self.modulus)
+        [poseidon_large(self.modulus), poseidon_large(self.redc)]
     }
 
     pub fn validate_in_range(self) {

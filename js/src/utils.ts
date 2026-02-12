@@ -146,47 +146,31 @@ export function makeEmailAddressCharTable(): string {
   return tableStr;
 }
 
-/**
- * Hash an RSA public key by converting 18 x 120-bit limbs into 17 x 121-bit chunks (modulus-only),
- * mirroring Noir RSAPubkey<2048>::hash.
- *
- * Process:
- * - Inputs are 18 limbs of 120 bits for the modulus and redc (redc unused in hashing).
- * - Build 17 contiguous 121-bit chunks from the 18 x 120-bit modulus limbs.
- * - Merge pairs of 121-bit chunks into 8 elements using base 2^121; keep the last chunk as the 9th element:
- *   input[i] = chunk[2i] + chunk[2i+1] * 2^121, for i in 0..7
- *   input[8] = chunk[16]
- * - Poseidon(input[0..8]) -> final hash
- *
- * @param modulusLimbs 18 BigInts (each <= 120 bits) representing the RSA modulus limbs
- * @param redcLimbs 18 BigInts (unused in hashing; kept for backward compatibility)
- * @returns Final Poseidon hash as a BigInt
- */
-export async function hashRSAPublicKey(
-  modulusLimbs: bigint[],
-  redcLimbs: bigint[]
-): Promise<bigint> {
+export type RSAPublicKeyHashes = {
+  modulusHash: bigint;
+  redcHash: bigint;
+};
+
+function hashLimbArrayToPoseidon(
+  limbs120: bigint[],
+  poseidon: Awaited<ReturnType<typeof buildPoseidon>>
+): bigint {
   const NUM_INPUT_LIMBS_120 = 18; // 18 x 120-bit limbs
   const NUM_CHUNKS_121 = 17; // produce 17 contiguous 121-bit chunks
   const NUM_POSEIDON_INPUTS = 9;
   const BASE_121 = 1n << 121n;
 
-  if (
-    modulusLimbs.length !== NUM_INPUT_LIMBS_120 ||
-    redcLimbs.length !== NUM_INPUT_LIMBS_120
-  ) {
+  if (limbs120.length !== NUM_INPUT_LIMBS_120) {
     throw new Error(
-      `Expected ${NUM_INPUT_LIMBS_120} limbs for both modulus and redc, but received ${modulusLimbs.length} and ${redcLimbs.length}`
+      `Expected ${NUM_INPUT_LIMBS_120} limbs, but received ${limbs120.length}`
     );
   }
-
-  const poseidon = await buildPoseidon();
 
   // Step 1: Build 17 contiguous 121-bit chunks from 18 x 120-bit limbs
   const chunks121: bigint[] = new Array(NUM_CHUNKS_121).fill(0n);
   for (let j = 0; j < NUM_CHUNKS_121; j++) {
-    const a0 = modulusLimbs[j];
-    const a1 = j + 1 < NUM_INPUT_LIMBS_120 ? modulusLimbs[j + 1] : 0n;
+    const a0 = limbs120[j];
+    const a1 = j + 1 < NUM_INPUT_LIMBS_120 ? limbs120[j + 1] : 0n;
 
     const shiftLow = BigInt(j);
     const lower = a0 >> shiftLow; // a0 / 2^j
@@ -209,7 +193,23 @@ export async function hashRSAPublicKey(
   poseidonInputs[8] = chunks121[16];
 
   const finalHashRaw = poseidon(poseidonInputs);
-  const finalHash = poseidon.F.toObject(finalHashRaw);
+  return poseidon.F.toObject(finalHashRaw);
+}
 
-  return finalHash;
+/**
+ * Hash RSA pubkey limbs into separate Poseidon hashes for modulus and redc.
+ *
+ * This mirrors the Noir limb-conversion and folding path used in
+ * RSAPubkey<2048>::hash-compatible hashing.
+ */
+export async function hashRSAPublicKey(
+  modulusLimbs: bigint[],
+  redcLimbs: bigint[]
+): Promise<RSAPublicKeyHashes> {
+  const poseidon = await buildPoseidon();
+
+  return {
+    modulusHash: hashLimbArrayToPoseidon(modulusLimbs, poseidon),
+    redcHash: hashLimbArrayToPoseidon(redcLimbs, poseidon),
+  };
 }

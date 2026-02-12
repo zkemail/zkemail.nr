@@ -21,8 +21,9 @@ global MAX_PARTIAL_EMAIL_BODY_LENGTH: u32 = 192;
  * @param redc_params_limbs - Barrett Reduction Parameter for Pubkey for efficient signature verification
  * @param signature - The DKIM RSA Signature
  * @return - 
- *         0: Pedersen hash of DKIM public key (root of trust)
- *         1: Pedersen hash of DKIM signature (email nullifier)
+ *         0: Poseidon hash of DKIM public key modulus (root of trust)
+ *         1: Poseidon hash of DKIM public key redc parameter
+ *         2: Pedersen hash of DKIM signature (email nullifier)
  */
 fn main(
     header: BoundedVec<u8, MAX_EMAIL_HEADER_LENGTH>,
@@ -33,7 +34,7 @@ fn main(
     dkim_header_sequence: Sequence,
     partial_body_hash: [u32; 8],
     partial_body_real_length: u64,
-) -> pub [Field; 2] {
+) -> pub [Field; 3] {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH, "Email header length exceeds maximum length");
     assert(
@@ -63,5 +64,6 @@ fn main(
 
     // hash the pubkey and signature for the standard outputs
     let email_nullifier = pedersen_hash(signature);
-    [pubkey.hash(), email_nullifier]
+    let pubkey_hash = pubkey.hash();
+    [pubkey_hash[0], pubkey_hash[1], email_nullifier]
 }

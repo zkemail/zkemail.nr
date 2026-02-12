@@ -18,8 +18,9 @@ global MAX_EMAIL_HEADER_LENGTH: u32 = 512;
  * @param to_header_sequence - The index and length of the "To" header field
  * @param to_address_sequence - The index and length of the "To" email address
  * @return - 
- *         0: Pedersen hash of DKIM public key (root of trust)
- *         1: Pedersen hash of DKIM signature (email nullifier)
+ *         0: Poseidon hash of DKIM public key modulus (root of trust)
+ *         1: Poseidon hash of DKIM public key redc parameter
+ *         2: Pedersen hash of DKIM signature (email nullifier)
  */
 fn main(
     header: BoundedVec<u8, MAX_EMAIL_HEADER_LENGTH>,
@@ -29,7 +30,7 @@ fn main(
     from_address_sequence: Sequence,
     to_header_sequence: Sequence,
     to_address_sequence: Sequence,
-    ) -> pub ([Field; 2], BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>, BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>) {
+    ) -> pub ([Field; 3], BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>, BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH>) {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
 
@@ -45,6 +46,7 @@ fn main(
 
     // hash the pubkey and signature for the standard outputs
     let email_nullifier = pedersen_hash(signature);
-    let standard_out = [pubkey.hash(), email_nullifier];
+    let pubkey_hash = pubkey.hash();
+    let standard_out = [pubkey_hash[0], pubkey_hash[1], email_nullifier];
     (standard_out, from_address, to_address)
 }

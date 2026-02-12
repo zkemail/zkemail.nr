@@ -19,8 +19,9 @@ global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
  * @param body_hash_index - The index of the body hash in the partial hash array
  * @param dkim_header_sequence - The index and length of the DKIM header field
  * @return - 
- *         0: Pedersen hash of DKIM public key (root of trust)
- *         1: Pedersen hash of DKIM signature (email nullifier)
+ *         0: Poseidon hash of DKIM public key modulus (root of trust)
+ *         1: Poseidon hash of DKIM public key redc parameter
+ *         2: Pedersen hash of DKIM signature (email nullifier)
  */
 fn main(
     header: BoundedVec<u8, MAX_EMAIL_HEADER_LENGTH>,
@@ -30,7 +31,7 @@ fn main(
     signature: [Field; KEY_LIMBS_2048],
     body_hash_index: u32,
     dkim_header_sequence: Sequence,
-) -> pub [Field; 2] {
+) -> pub [Field; 3] {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
     assert(body.len() <= MAX_EMAIL_BODY_LENGTH);
@@ -63,5 +64,6 @@ fn main(
     // ~ 10,255 constraints
     // hash the pubkey and signature for the standard outputs
     let email_nullifier = pedersen_hash(signature);
-    [pubkey.hash(), email_nullifier]
+    let pubkey_hash = pubkey.hash();
+    [pubkey_hash[0], pubkey_hash[1], email_nullifier]
 }

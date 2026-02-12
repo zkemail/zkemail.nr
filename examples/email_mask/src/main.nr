@@ -20,8 +20,9 @@ global MAX_EMAIL_BODY_LENGTH: u32 = 1024;
  * @param header_mask - The mask for the header
  * @param body_mask - The mask for the body
  * @return - 
- *         0: Pedersen hash of DKIM public key (root of trust)
- *         1: Pedersen hash of DKIM signature (email nullifier)
+ *         0: Poseidon hash of DKIM public key modulus (root of trust)
+ *         1: Poseidon hash of DKIM public key redc parameter
+ *         2: Pedersen hash of DKIM signature (email nullifier)
  */
 fn main(
     header: BoundedVec<u8, MAX_EMAIL_HEADER_LENGTH>,
@@ -32,7 +33,7 @@ fn main(
     dkim_header_sequence: Sequence,
     header_mask: [bool; MAX_EMAIL_HEADER_LENGTH],
     body_mask: [bool; MAX_EMAIL_BODY_LENGTH],
-) -> pub ([Field; 2], [u8; MAX_EMAIL_HEADER_LENGTH], [u8; MAX_EMAIL_BODY_LENGTH]) {
+) -> pub ([Field; 3], [u8; MAX_EMAIL_HEADER_LENGTH], [u8; MAX_EMAIL_BODY_LENGTH]) {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH);
     assert(body.len() <= MAX_EMAIL_BODY_LENGTH);
@@ -58,6 +59,7 @@ fn main(
 
     // hash the pubkey and signature for the standard outputs
     let email_nullifier = pedersen_hash(signature);
-    let standard_out = [pubkey.hash(), email_nullifier];
+    let pubkey_hash = pubkey.hash();
+    let standard_out = [pubkey_hash[0], pubkey_hash[1], email_nullifier];
     (standard_out, masked_header, masked_body)
 }
