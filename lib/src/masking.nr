@@ -12,7 +12,7 @@ pub fn mask_text<let TEXT_LEN: u32>(
     mask: [bool; TEXT_LEN],
 ) -> [u8; TEXT_LEN] {
     let mut masked_text = [0; TEXT_LEN];
-    // probably fine to just iterate through whole thing without an if statement
+    // iterate full array; mask zeroes out bytes beyond text length
     for i in 0..TEXT_LEN {
         masked_text[i] = (text.get_unchecked(i) * mask[i] as u8);
     }
