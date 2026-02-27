@@ -1,0 +1,7 @@
+[package]
+name = "bench_feat_addr"
+type = "bin"
+compiler_version = ">=1.0.0"
+
+[dependencies]
+zkemail = { path = "../../../../lib" }

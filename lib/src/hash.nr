@@ -8,7 +8,7 @@ pub fn poseidon_large(limbs120x18: [Field; KEY_LIMBS_2048]) -> Field {
     poseidon::bn254::hash_9(poseidon_input)
 }
 
-// Compute 2^n as u128 (n is small: <= 121)
+// Compute 2^n as u128 for small n (max 121 for limb operations)
 fn pow2_u128(n: u32) -> u128 {
     let mut result: u128 = 1;
     for _ in 0..n {

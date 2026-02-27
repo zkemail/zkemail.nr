@@ -1,0 +1,30 @@
+{
+  "name": "zkemail-nr-benchmark",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate-keys": "npx tsx lib/generate-keys.ts",
+    "generate-emails": "npx tsx lib/generate-signed-emails.ts",
+    "verify-emails": "npx tsx lib/verify-emails.ts",
+    "generate-circuits": "npx tsx lib/circuit-generator.ts",
+    "gate-count": "npx tsx runners/run-gates.ts",
+    "generate-inputs": "npx tsx lib/input-generator.ts",
+    "benchmark:prove": "npx tsx runners/run-proving.ts",
+    "report": "npx tsx lib/reporter.ts",
+    "setup": "pnpm run generate-keys && pnpm run generate-emails && pnpm run verify-emails && pnpm run generate-circuits",
+    "benchmark:gates": "pnpm run setup && pnpm run gate-count",
+    "benchmark:all": "pnpm run setup && pnpm run gate-count && pnpm run generate-inputs && pnpm run benchmark:prove && pnpm run report",
+    "clean": "npx tsx -e \"import{execSync}from'child_process';try{execSync('trash circuits emails keys results inputs',{stdio:'inherit'})}catch{console.log('Nothing to clean')}\""
+  },
+  "dependencies": {
+    "mailauth": "^4.13.0",
+    "node-forge": "^1.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/node-forge": "^1.3.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

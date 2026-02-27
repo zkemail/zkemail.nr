@@ -12,8 +12,7 @@ pub struct RSAPubkey<let KEY_LIMBS: u32> {
 impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
 
     pub fn new(modulus: [Field; KEY_LIMBS], redc: [Field; KEY_LIMBS]) -> Self {
-        let pubkey = Self { modulus, redc };
-        pubkey
+        Self { modulus, redc }
     }
 }
 
@@ -107,7 +106,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
             self.redc[i].assert_max_bit_size::<120>();
         }
         self.modulus[KEY_LIMBS_2048 - 1].assert_max_bit_size::<2048 - ((KEY_LIMBS_2048 - 1) * 120)>();
-        self.redc[KEY_LIMBS_2048 - 1].assert_max_bit_size::<120>(); // we get 2053 sometimes?
+        self.redc[KEY_LIMBS_2048 - 1].assert_max_bit_size::<120>();
     }
 }
 

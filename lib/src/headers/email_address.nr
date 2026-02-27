@@ -37,7 +37,7 @@ pub fn parse_email_address<let MAX_HEADER_LENGTH: u32>(
     header: BoundedVec<u8, MAX_HEADER_LENGTH>,
     email_address_sequence: Sequence,
 ) -> BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> {
-    // check the sequence is proceeded by an acceptable character
+    // check the sequence is preceded by an acceptable character
     if email_address_sequence.index != 0 {
         assert(
             EMAIL_ADDRESS_CHAR_TABLE[header.get_unchecked(email_address_sequence.index - 1)] == 2,
@@ -67,6 +67,6 @@ pub fn parse_email_address<let MAX_HEADER_LENGTH: u32>(
         }
     }
     email_address.len = email_address_sequence.length;
-    // todo: should probably introduce a check for @
+    // TODO(#57): add validation that address contains exactly one '@'
     email_address
 }
