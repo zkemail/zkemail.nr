@@ -27,10 +27,10 @@ impl Sequence {
         self.index + self.length
     }
 }
-// allowable chars in an email address (js/src/utils:makeAllowableEmailCharsTable()
-// "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-@" = 1
-// "<: " = 2
-// ">\r\n" = 3
+// Allowable chars in an email address (see js/src/utils:makeAllowableEmailCharsTable())
+// 1 = valid email chars: A-Za-z0-9.-@
+// 2 = delimiters before address: '<', ':', ' '
+// 3 = delimiters after address: '>', '\r', '\n'
 global EMAIL_ADDRESS_CHAR_TABLE: [u8; 123] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 2, 0, 3, 0,
