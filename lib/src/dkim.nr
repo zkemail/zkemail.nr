@@ -12,8 +12,7 @@ pub struct RSAPubkey<let KEY_LIMBS: u32> {
 impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
 
     pub fn new(modulus: [Field; KEY_LIMBS], redc: [Field; KEY_LIMBS]) -> Self {
-        let pubkey = Self { modulus, redc };
-        pubkey
+        Self { modulus, redc }
     }
 }
 
