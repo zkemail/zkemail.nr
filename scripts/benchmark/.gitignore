@@ -1,0 +1,10 @@
+node_modules/
+dist/
+emails/
+keys/
+inputs/
+results/
+tmp_*.mjs
+
+# Ignore compiled circuit artifacts, keep source
+circuits/*/target/
