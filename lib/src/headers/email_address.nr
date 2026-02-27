@@ -67,6 +67,6 @@ pub fn parse_email_address<let MAX_HEADER_LENGTH: u32>(
         }
     }
     email_address.len = email_address_sequence.length;
-    // todo: should probably introduce a check for @
+    // TODO(#57): add validation that address contains exactly one '@'
     email_address
 }
