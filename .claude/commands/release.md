@@ -55,7 +55,7 @@ Print:
 Release v{version} published!
 
 To publish to npm:
-  cd js && yarn publish
+  cd js && npm publish --access public
 ```
 
 Do not auto-publish to npm — this requires credentials and should be done manually.
