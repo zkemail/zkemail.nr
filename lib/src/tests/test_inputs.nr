@@ -243,6 +243,40 @@ pub(crate) mod EmailAddressUnderscore {
     pub(crate) global ADDRESS_SEQUENCE: Sequence = Sequence { index: 7, length: 20 };
 }
 
+pub(crate) mod EmailSmall {
+    use crate::{dkim::RSAPubkey, KEY_LIMBS_1024};
+
+    // Synthetic 1024-bit RSA key for hash testing.
+    // Values are arbitrary but respect range constraints:
+    // - modulus limbs[0..7]: 120 bits each
+    // - modulus limbs[8]: 64 bits (1024 - 8*120 = 64)
+    // - redc limbs[0..8]: 120 bits each
+    pub(crate) global PUBKEY: RSAPubkey<KEY_LIMBS_1024> = RSAPubkey::new(
+        [
+            0xaabbccdd11223344aabbccdd1122,
+            0x112233445566778899aabbccddee,
+            0xffeeddccbbaa99887766554433,
+            0x00112233445566778899aabbccddee,
+            0xdeadbeefcafebabe12345678abcd,
+            0xfedcba98765432100fedcba98765,
+            0x0123456789abcdef0123456789ab,
+            0xabcdef0123456789abcdef012345,
+            0xdeadbeefcafebabe,
+        ],
+        [
+            0x111111111111111111111111111111,
+            0x222222222222222222222222222222,
+            0x333333333333333333333333333333,
+            0x444444444444444444444444444444,
+            0x555555555555555555555555555555,
+            0x666666666666666666666666666666,
+            0x777777777777777777777777777777,
+            0x888888888888888888888888888888,
+            0x99999999999999999999,
+        ],
+    );
+}
+
 pub(crate) mod PartialHash {
     pub(crate) global DATA: [u8; 192] = [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,

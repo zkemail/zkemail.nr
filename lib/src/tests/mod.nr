@@ -129,14 +129,13 @@ mod test_tampered_hash {
     }
 }
 
-mod test_redc_binding {
+mod test_redc_binding_2048 {
     use crate::tests::test_inputs::EmailLarge;
 
     /// Regression test for Veridise vulnerability reintroduced by PR #52.
-    /// Verifies that modifying redc changes the hash output, i.e. the prover
-    /// is bound to the redc parameter they provide.
+    /// Verifies that modifying redc changes hash[1] (redc hash) but NOT hash[0] (modulus hash).
     #[test]
-    fn test_modified_redc_changes_hash() {
+    fn test_modified_redc_changes_hash_2048() {
         let pubkey = EmailLarge::PUBKEY;
         let original_hash = pubkey.hash();
 
@@ -146,11 +145,43 @@ mod test_redc_binding {
         let tampered_pubkey = crate::dkim::RSAPubkey::new(pubkey.modulus, tampered_redc);
         let tampered_hash = tampered_pubkey.hash();
 
-        // The hash MUST differ when redc is modified -- if it doesn't,
-        // an attacker could substitute a different redc and forge proofs
+        // hash[0] = poseidon(modulus) -- must be UNCHANGED since modulus is the same
         assert(
-            original_hash != tampered_hash,
-            "hash() must produce different output when redc is modified",
+            original_hash[0] == tampered_hash[0],
+            "modulus hash (hash[0]) must not change when only redc is modified",
+        );
+        // hash[1] = poseidon(redc) -- must DIFFER since redc was tampered
+        assert(
+            original_hash[1] != tampered_hash[1],
+            "redc hash (hash[1]) must change when redc is modified",
+        );
+    }
+}
+
+mod test_redc_binding_1024 {
+    use crate::tests::test_inputs::EmailSmall;
+
+    /// Same regression test as test_redc_binding but for the 1024-bit code path,
+    /// which uses poseidon_large_padded_1024 (pads 9 limbs to 18 before hashing).
+    #[test]
+    fn test_modified_redc_changes_hash_1024() {
+        let pubkey = EmailSmall::PUBKEY;
+        let original_hash = pubkey.hash();
+
+        let mut tampered_redc = pubkey.redc;
+        tampered_redc[0] = tampered_redc[0] + 1;
+        let tampered_pubkey = crate::dkim::RSAPubkey::new(pubkey.modulus, tampered_redc);
+        let tampered_hash = tampered_pubkey.hash();
+
+        // hash[0] = poseidon_large_padded_1024(modulus) -- must be UNCHANGED
+        assert(
+            original_hash[0] == tampered_hash[0],
+            "modulus hash (hash[0]) must not change when only redc is modified (1024-bit)",
+        );
+        // hash[1] = poseidon_large_padded_1024(redc) -- must DIFFER
+        assert(
+            original_hash[1] != tampered_hash[1],
+            "redc hash (hash[1]) must change when redc is modified (1024-bit)",
         );
     }
 }
