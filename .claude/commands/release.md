@@ -35,7 +35,8 @@ git tag -a v{version} -m "v{version}"
 Ask the user for confirmation, then push:
 
 ```bash
-git push origin main --tags
+git push origin main
+git push origin v{version}
 ```
 
 ### 5. Create GitHub release
