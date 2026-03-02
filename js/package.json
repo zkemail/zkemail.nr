@@ -87,6 +87,7 @@
     "ignorePatterns": [
       "src/lib/**/*",
       "tests/**/*",
+      "scripts/**/*",
       "dist",
       "node_modules"
     ],
