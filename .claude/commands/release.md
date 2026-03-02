@@ -1,102 +1,60 @@
 # Release
 
-Automate version bumps, changelog updates, and release tagging for zkemail.nr.
+Tag and publish a release from main. Run this after merging a PR that used `/bump`.
 
 ## Steps
 
-### 1. Audit current versions
+### 1. Verify on main
 
-Read and report the current version state:
+Check the current branch. If not on `main`, warn the user and ask for confirmation before proceeding.
 
-- `js/package.json` → current npm version
+### 2. Audit current state
+
+Read and report:
+
+- `js/package.json` → current version
 - Latest git tag (`git tag --sort=-creatordate | head -1`)
-- `README.md` → Nargo.toml tag example
 - `CHANGELOG.md` → latest entry
 
-Report any inconsistencies between these sources.
+Verify the version in `package.json` is ahead of the latest git tag (i.e., a `/bump` was merged). If not, warn the user that there's nothing new to release.
 
-### 2. Ask for release details
+### 3. Confirm tag creation
 
-Use AskUserQuestion to gather:
+Ask the user for confirmation:
 
-**Change type:**
-- `patch` — bug fix, no breaking changes
-- `minor` — new feature, backwards compatible
-- `major` — breaking change (verifier key regeneration, API changes)
+> Ready to tag `v{version}` on the current commit. Proceed?
 
-**Change description:** Brief summary for the changelog entry.
-
-**Breaking changes?** If major, or if user confirms breaking: ask for migration notes (e.g., "Verifier keys must be regenerated").
-
-### 3. Compute new version
-
-Parse the current version from `js/package.json` and bump according to the change type:
-- patch: `1.4.0` → `1.4.1`
-- minor: `1.4.0` → `1.5.0`
-- major: `1.4.0` → `2.0.0`
-
-The git tag will be `v{new_version}` (e.g., `v1.4.1`). This aligns npm and git tag versions.
-
-### 4. Apply changes
-
-**4a. Update `js/package.json`**
-
-Change the `"version"` field to the new version.
-
-**4b. Prepend to `CHANGELOG.md`**
-
-Add a new entry at the top (below the header), following Keep a Changelog format:
-
-```markdown
-## [{version}] - {YYYY-MM-DD}
-
-### {Section}
-
-- {description}
-```
-
-Sections: Added, Changed, Fixed, Removed, Breaking Changes.
-
-If there are breaking changes, add a `### Breaking Changes` section with migration notes.
-
-Update the comparison links at the bottom of the file.
-
-**4c. Update `README.md`**
-
-Find the Nargo.toml dependency example and update the tag:
-
-```toml
-zkemail = { tag = "v{new_version}", git = "https://github.com/zkemail/zkemail.nr", directory = "lib" }
-```
-
-### 5. Create commit and tag
-
-Stage the changed files and create a commit:
-
-```
-chore: release v{new_version}
-```
-
-Then create an annotated git tag:
+Create an annotated git tag:
 
 ```bash
-git tag -a v{new_version} -m "v{new_version}"
+git tag -a v{version} -m "v{version}"
 ```
 
-### 6. Post-release reminders
+### 4. Push tag
 
-Print the following:
+Ask the user for confirmation, then push:
+
+```bash
+git push origin main --tags
+```
+
+### 5. Create GitHub release
+
+Ask the user for confirmation, then create a GitHub release using the changelog entry:
+
+```bash
+gh release create v{version} --title "v{version}" --notes "$(sed -n '/## \[{version}\]/,/^## \[/{//!p;}' CHANGELOG.md)"
+```
+
+### 6. npm publish reminder
+
+Print:
 
 ```
-Release v{new_version} committed and tagged locally.
+Release v{version} published!
 
-Next steps:
-  1. Push the branch and tag:
-     git push origin {branch} --tags
-
-  2. Publish to npm:
-     cd js && yarn publish
-
-  3. Create a GitHub release:
-     gh release create v{new_version} --title "v{new_version}" --notes-file <(sed -n '/## \[{version}\]/,/## \[/{{ /## \[{version}\]/d; /## \[/d; p; }}' CHANGELOG.md)
+To publish to npm:
+  cd js && yarn publish
 ```
+
+Do not auto-publish to npm — this requires credentials and should be done manually.
