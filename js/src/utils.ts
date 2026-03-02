@@ -122,7 +122,7 @@ export function makeEmailAddressCharTable(): string {
   const tableLength = 123;
   const table = new Array(tableLength).fill(0);
   const emailChars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-@";
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-@";
   const precedingChars = "<: ";
   const proceedingChars = ">\r\n";
   // set valid email chars
