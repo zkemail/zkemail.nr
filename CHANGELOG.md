@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-02
+
+### Changed
+
+- `RSAPubkey::hash()` now returns `[Field; 2]` — separate Poseidon hashes for modulus and redc parameter
+- `hashRSAPublicKey()` JS function now returns `{ modulusHash, redcHash }` instead of a single `bigint`
+- Example circuit outputs grow from 2 to 3 public fields (`[modulus_hash, redc_hash, email_nullifier]`)
+
+### Added
+
+- `poseidon_large_padded_1024` helper for hashing 1024-bit keys by zero-padding to 2048-bit width
+- 1024-bit key support in JS `hashRSAPublicKey()` (accepts 9-limb arrays)
+- `RSAPublicKeyHashes` type export from JS package
+- Regression tests for redc binding on both 1024-bit and 2048-bit code paths
+
+### Fixed
+
+- Bind prover to redc parameter — previously only the modulus was hashed, allowing a malicious prover to supply an arbitrary redc and still match the public key hash (Veridise vulnerability reintroduced in PR #52)
+
+### Breaking Changes
+
+- **Verifier keys must be regenerated.** The `hash()` return type and circuit outputs have changed.
+- **JS consumers** must update to destructure `{ modulusHash, redcHash }` instead of using a single `bigint` return value.
+
 ## [1.4.0] - 2026-03-02
 
 ### Fixed
@@ -56,6 +80,7 @@ _Released as git tag `v.1.0.0-beta.5`._
 
 - Minor fixes
 
+[2.0.0]: https://github.com/zkemail/zkemail.nr/compare/v1.4.0...v2.0.0
 [1.4.0]: https://github.com/zkemail/zkemail.nr/compare/v.1.0.1-beta.5...v1.4.0
 [1.0.1-beta.5]: https://github.com/zkemail/zkemail.nr/compare/v.1.0.0-beta.5...v.1.0.1-beta.5
 [1.0.0-beta.5]: https://github.com/zkemail/zkemail.nr/compare/v0.4.4...v.1.0.0-beta.5

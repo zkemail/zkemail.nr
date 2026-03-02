@@ -7,7 +7,7 @@ In your Nargo.toml file, add the version of this library you would like to insta
 
 ```toml
 [dependencies]
-zkemail = { tag = "v1.4.0", git = "https://github.com/zkemail/zkemail.nr", directory = "lib" }
+zkemail = { tag = "v2.0.0", git = "https://github.com/zkemail/zkemail.nr", directory = "lib" }
 ```
 
 The library exports the following functions:
