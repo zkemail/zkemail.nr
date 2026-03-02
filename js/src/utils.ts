@@ -156,21 +156,27 @@ function hashLimbArrayToPoseidon(
   poseidon: Awaited<ReturnType<typeof buildPoseidon>>
 ): bigint {
   const NUM_INPUT_LIMBS_120 = 18; // 18 x 120-bit limbs
+  const NUM_LIMBS_1024 = 9; // 9 x 120-bit limbs for 1024-bit keys
   const NUM_CHUNKS_121 = 17; // produce 17 contiguous 121-bit chunks
   const NUM_POSEIDON_INPUTS = 9;
   const BASE_121 = 1n << 121n;
 
-  if (limbs120.length !== NUM_INPUT_LIMBS_120) {
+  if (limbs120.length !== NUM_INPUT_LIMBS_120 && limbs120.length !== NUM_LIMBS_1024) {
     throw new Error(
-      `Expected ${NUM_INPUT_LIMBS_120} limbs, but received ${limbs120.length}`
+      `Expected ${NUM_INPUT_LIMBS_120} or ${NUM_LIMBS_1024} limbs, but received ${limbs120.length}`
     );
   }
+
+  // Pad 1024-bit (9 limbs) to 2048-bit width (18 limbs) — mirrors Noir's poseidon_large_padded_1024
+  const padded = limbs120.length === NUM_INPUT_LIMBS_120
+    ? limbs120
+    : [...limbs120, ...new Array(NUM_INPUT_LIMBS_120 - limbs120.length).fill(0n)];
 
   // Step 1: Build 17 contiguous 121-bit chunks from 18 x 120-bit limbs
   const chunks121: bigint[] = new Array(NUM_CHUNKS_121).fill(0n);
   for (let j = 0; j < NUM_CHUNKS_121; j++) {
-    const a0 = limbs120[j];
-    const a1 = j + 1 < NUM_INPUT_LIMBS_120 ? limbs120[j + 1] : 0n;
+    const a0 = padded[j];
+    const a1 = j + 1 < NUM_INPUT_LIMBS_120 ? padded[j + 1] : 0n;
 
     const shiftLow = BigInt(j);
     const lower = a0 >> shiftLow; // a0 / 2^j
