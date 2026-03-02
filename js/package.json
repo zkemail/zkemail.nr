@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest",
+    "check:char-table": "node scripts/check-char-table-sync.js",
     "lint": "eslint .",
     "prepublishOnly": "yarn lint && yarn build"
   },

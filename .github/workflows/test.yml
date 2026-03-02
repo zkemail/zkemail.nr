@@ -42,6 +42,32 @@ jobs:
         working-directory: ./lib
         run: nargo fmt --check
 
+  check-char-table:
+    name: check-char-table
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: js/yarn.lock
+
+      - name: Install dependencies
+        working-directory: ./js
+        run: yarn install --frozen-lockfile
+
+      - name: Build JS
+        working-directory: ./js
+        run: yarn build
+
+      - name: Verify char table sync
+        working-directory: ./js
+        run: node scripts/check-char-table-sync.js
+
   # This is a job which depends on all test jobs and reports the overall status.
   # This allows us to add/remove test jobs without having to update the required workflows.
   tests-end:
@@ -52,6 +78,7 @@ jobs:
     needs:
       - test
       - format
+      - check-char-table
 
     steps:
       - name: Report overall success
