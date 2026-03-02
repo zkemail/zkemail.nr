@@ -1,4 +1,4 @@
-use crate::{hash::poseidon_large, KEY_LIMBS_1024, KEY_LIMBS_2048, RSA_EXPONENT};
+use crate::{hash::{poseidon_large, poseidon_large_padded_1024}, KEY_LIMBS_1024, KEY_LIMBS_2048, RSA_EXPONENT};
 use bignum::{params::BigNumParams, RuntimeBigNum};
 use poseidon::poseidon;
 use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
@@ -42,22 +42,10 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         header_hash
     }
 
-    pub fn hash(self) -> Field {
+    pub fn hash(self) -> [Field; 2] {
         // validate
         self.validate_in_range();
-        let mut dkim_preimage = [0; 9];
-        // compose first 4 limbs of modulus and redc
-        for i in 0..4 {
-            let modulus_hi = self.modulus[i * 2] * 2.pow_32(120);
-            let redc_hi = self.redc[i * 2] * 2.pow_32(120);
-            dkim_preimage[i] = modulus_hi + self.modulus[i * 2 + 1];
-            dkim_preimage[i + 4] = redc_hi + self.redc[i * 2 + 1];
-        }
-        // compose last two elements of redc and modulus together
-        let modulus_hi = self.modulus[8] * 2.pow_32(120);
-        dkim_preimage[8] = modulus_hi + self.redc[8];
-        // hash the pubkey
-        poseidon::bn254::hash_9(dkim_preimage)
+        [poseidon_large_padded_1024(self.modulus), poseidon_large_padded_1024(self.redc)]
     }
 
     pub fn validate_in_range(self) {

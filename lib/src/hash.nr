@@ -1,4 +1,4 @@
-use crate::KEY_LIMBS_2048;
+use crate::{KEY_LIMBS_1024, KEY_LIMBS_2048};
 use poseidon::poseidon;
 
 // Hash 18 x 120-bit limbs into a single Field - compatible with https://github.com/zkemail/zk-email-verify/blob/62dd54871857697a6f2fb9c0a8ea72e38c7eb293/packages/circuits/utils/hash.circom#L15
@@ -60,4 +60,18 @@ pub fn fold_limbs121<let K: u32, let K_out: u32>(limbs121: [Field; K]) -> [Field
         }
     }
     input
+}
+
+// Pad 1024-bit limbs (9 x 120-bit) to 2048-bit width (18 x 120-bit) by appending zero limbs.
+pub fn pad_limbs_1024_to_2048(limbs120x9: [Field; KEY_LIMBS_1024]) -> [Field; KEY_LIMBS_2048] {
+    let mut padded: [Field; KEY_LIMBS_2048] = [0; KEY_LIMBS_2048];
+    for i in 0..KEY_LIMBS_1024 {
+        padded[i] = limbs120x9[i];
+    }
+    padded
+}
+
+// Hash a 1024-bit key array by zero-padding to 2048-bit width and reusing poseidon_large.
+pub fn poseidon_large_padded_1024(limbs120x9: [Field; KEY_LIMBS_1024]) -> Field {
+    poseidon_large(pad_limbs_1024_to_2048(limbs120x9))
 }

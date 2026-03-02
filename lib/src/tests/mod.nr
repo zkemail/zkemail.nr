@@ -129,6 +129,32 @@ mod test_tampered_hash {
     }
 }
 
+mod test_redc_binding {
+    use crate::tests::test_inputs::EmailLarge;
+
+    /// Regression test for Veridise vulnerability reintroduced by PR #52.
+    /// Verifies that modifying redc changes the hash output, i.e. the prover
+    /// is bound to the redc parameter they provide.
+    #[test]
+    fn test_modified_redc_changes_hash() {
+        let pubkey = EmailLarge::PUBKEY;
+        let original_hash = pubkey.hash();
+
+        // Construct a pubkey with same modulus but tampered redc (flip one limb)
+        let mut tampered_redc = pubkey.redc;
+        tampered_redc[0] = tampered_redc[0] + 1;
+        let tampered_pubkey = crate::dkim::RSAPubkey::new(pubkey.modulus, tampered_redc);
+        let tampered_hash = tampered_pubkey.hash();
+
+        // The hash MUST differ when redc is modified -- if it doesn't,
+        // an attacker could substitute a different redc and forge proofs
+        assert(
+            original_hash != tampered_hash,
+            "hash() must produce different output when redc is modified",
+        );
+    }
+}
+
 mod header_field_access {
 
     use crate::{headers::body_hash::get_body_hash, Sequence, tests::test_inputs::EmailLarge};
