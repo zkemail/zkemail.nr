@@ -8,3 +8,9 @@ zk-email-verify
 
 # Generated Prover.toml examples
 examples/*/Prover.toml
+
+# Claude Code local settings
+.claude/*
+!.claude/commands/
+
+docs/

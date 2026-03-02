@@ -231,6 +231,18 @@ pub(crate) mod EmailAddresses {
         Sequence { index: 8, length: 24 };
 }
 
+pub(crate) mod EmailAddressUnderscore {
+    use crate::{MAX_EMAIL_ADDRESS_LENGTH, Sequence};
+
+    pub(crate) global ADDRESS: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> =
+        BoundedVec::from_array("john_doe@example.com".as_bytes());
+    // "\r\nfrom:john_doe@example.com\r\n" = 29 bytes
+    pub(crate) global HEADER: [u8; 29] =
+        comptime { "\r\nfrom:john_doe@example.com\r\n".as_bytes() };
+    pub(crate) global FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 25 };
+    pub(crate) global ADDRESS_SEQUENCE: Sequence = Sequence { index: 7, length: 20 };
+}
+
 pub(crate) mod PartialHash {
     pub(crate) global DATA: [u8; 192] = [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,

@@ -1,12 +1,13 @@
 {
   "name": "@zk-email/zkemail-nr",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "main": "dist",
   "types": "dist",
   "license": "MIT",
   "scripts": {
     "build": "tsc",
     "test": "jest",
+    "check:char-table": "node scripts/check-char-table-sync.js",
     "lint": "eslint .",
     "prepublishOnly": "yarn lint && yarn build"
   },

@@ -307,7 +307,10 @@ mod header_field_access {
 
 mod test_address_extraction {
     // header field constrains are not checked here, should work same as tests in header_field_access
-    use crate::{headers::email_address::get_email_address, tests::test_inputs::EmailAddresses};
+    use crate::{
+        headers::email_address::get_email_address,
+        tests::test_inputs::{EmailAddresses, EmailAddressUnderscore},
+    };
 
     #[test]
     fn test_email_only() {
@@ -359,6 +362,19 @@ mod test_address_extraction {
             from,
         );
         assert_eq(address, EmailAddresses::ADDRESS);
+    }
+
+    #[test]
+    fn test_underscore_address() {
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddressUnderscore::HEADER);
+        let address = get_email_address(
+            header,
+            EmailAddressUnderscore::FIELD_SEQUENCE,
+            EmailAddressUnderscore::ADDRESS_SEQUENCE,
+            from,
+        );
+        assert_eq(address, EmailAddressUnderscore::ADDRESS);
     }
 
     #[test(should_fail_with = "Email address must start immediately after '<' if bracket is present")]
