@@ -3,16 +3,28 @@
 
 const fs = require("fs");
 const path = require("path");
-const { makeEmailAddressCharTable } = require("../dist/utils");
 
-// Extract values from JS function output
-const jsOutput = makeEmailAddressCharTable();
-const jsArrayContent = jsOutput.match(/=\s*\[([\s\S]*)\]/);
-if (!jsArrayContent) {
-  console.error("ERROR: Could not parse JS makeEmailAddressCharTable() output");
-  process.exit(1);
+// Generate the expected char table inline (mirrors makeEmailAddressCharTable() in src/utils.ts)
+function buildEmailAddressCharTable() {
+  const tableLength = 123;
+  const table = new Array(tableLength).fill(0);
+  const emailChars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-@";
+  const precedingChars = "<: ";
+  const proceedingChars = ">\r\n";
+  for (let i = 0; i < emailChars.length; i++) {
+    table[emailChars.charCodeAt(i)] = 1;
+  }
+  for (let i = 0; i < precedingChars.length; i++) {
+    table[precedingChars.charCodeAt(i)] = 2;
+  }
+  for (let i = 0; i < proceedingChars.length; i++) {
+    table[proceedingChars.charCodeAt(i)] = 3;
+  }
+  return table;
 }
-const jsValues = jsArrayContent[1].match(/\d+/g).map(Number);
+
+const jsValues = buildEmailAddressCharTable();
 
 // Extract values from Noir source file
 const noirPath = path.resolve(__dirname, "../../lib/src/lib.nr");

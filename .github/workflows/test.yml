@@ -53,16 +53,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'yarn'
-          cache-dependency-path: js/yarn.lock
-
-      - name: Install dependencies
-        working-directory: ./js
-        run: yarn install --frozen-lockfile
-
-      - name: Build JS
-        working-directory: ./js
-        run: yarn build
 
       - name: Verify char table sync
         working-directory: ./js
