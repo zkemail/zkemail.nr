@@ -367,8 +367,7 @@ mod test_address_extraction {
     #[test]
     fn test_underscore_address() {
         let from: [u8; 4] = comptime { "from".as_bytes() };
-        let header: BoundedVec<u8, 512> =
-            BoundedVec::from_array(EmailAddressUnderscore::HEADER);
+        let header: BoundedVec<u8, 512> = BoundedVec::from_array(EmailAddressUnderscore::HEADER);
         let address = get_email_address(
             header,
             EmailAddressUnderscore::FIELD_SEQUENCE,
