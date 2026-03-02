@@ -10,6 +10,7 @@ zk-email-verify
 examples/*/Prover.toml
 
 # Claude Code local settings
-.claude/
+.claude/*
+!.claude/commands/
 
-thoughts/
+docs/
