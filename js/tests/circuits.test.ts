@@ -164,11 +164,70 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       );
       let modulus = inputs.pubkey.modulus.map((limb) => BigInt(limb));
       let redc = inputs.pubkey.redc.map((limb) => BigInt(limb));
-      let computed_hash = await hashRSAPublicKey(modulus, redc);
+      let computedHashes = await hashRSAPublicKey(modulus, redc);
       const result = await prover2048.simulateWitness(inputs);
+      // returnValue[0] = modulus hash, returnValue[1] = redc hash, returnValue[2] = email nullifier
       expect(result.returnValue[0].slice(2)).toEqual(
-        computed_hash.toString(16)
+        computedHashes.modulusHash.toString(16)
+      );
+      expect(result.returnValue[1].slice(2)).toEqual(
+        computedHashes.redcHash.toString(16)
       );
     });
+  });
+});
+
+describe("hashRSAPublicKey 1024-bit parity", () => {
+  it("1024-bit (9-limb) hash matches zero-padded 2048-bit (18-limb) hash", async () => {
+    // Synthetic 1024-bit key: 9 limbs for modulus and redc
+    const modulus9 = [
+      0xaabbccdd11223344aabbccdd1122n,
+      0x112233445566778899aabbccddeen,
+      0xffeeddccbbaa99887766554433n,
+      0x00112233445566778899aabbccddeen,
+      0xdeadbeefcafebabe12345678abcdn,
+      0xfedcba98765432100fedcba98765n,
+      0x0123456789abcdef0123456789abn,
+      0xabcdef0123456789abcdef012345n,
+      0xdeadbeefcafebaben,
+    ];
+    const redc9 = [
+      0x111111111111111111111111111111n,
+      0x222222222222222222222222222222n,
+      0x333333333333333333333333333333n,
+      0x444444444444444444444444444444n,
+      0x555555555555555555555555555555n,
+      0x666666666666666666666666666666n,
+      0x777777777777777777777777777777n,
+      0x888888888888888888888888888888n,
+      0x99999999999999999999n,
+    ];
+
+    // Hash with 9 limbs (1024-bit path)
+    const hash1024 = await hashRSAPublicKey(modulus9, redc9);
+
+    // Same data, manually zero-padded to 18 limbs (2048-bit path)
+    const modulus18 = [...modulus9, ...new Array(9).fill(0n)];
+    const redc18 = [...redc9, ...new Array(9).fill(0n)];
+    const hash2048Padded = await hashRSAPublicKey(modulus18, redc18);
+
+    // Both paths must produce identical hashes — this validates the JS padding
+    // logic mirrors Noir's poseidon_large_padded_1024
+    expect(hash1024.modulusHash).toEqual(hash2048Padded.modulusHash);
+    expect(hash1024.redcHash).toEqual(hash2048Padded.redcHash);
+  });
+
+  it("1024-bit hash changes when redc is modified", async () => {
+    const modulus = [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n];
+    const redc = [10n, 20n, 30n, 40n, 50n, 60n, 70n, 80n, 90n];
+    const tamperedRedc = [11n, 20n, 30n, 40n, 50n, 60n, 70n, 80n, 90n]; // redc[0] changed
+
+    const original = await hashRSAPublicKey(modulus, redc);
+    const tampered = await hashRSAPublicKey(modulus, tamperedRedc);
+
+    // modulus hash unchanged (same modulus)
+    expect(original.modulusHash).toEqual(tampered.modulusHash);
+    // redc hash changed
+    expect(original.redcHash).not.toEqual(tampered.redcHash);
   });
 });
