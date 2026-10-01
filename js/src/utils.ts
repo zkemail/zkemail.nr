@@ -65,24 +65,53 @@ export function toProverToml(inputs: any): string {
 /**
  * Get the index and length of a header field to use
  *
+ * Matches the circuit's `constrain_header_field`:
+ * - the field name is matched case-insensitively at the start of a header line ("DKIM-Signature"
+ *   under c=simple canonicalization, "dkim-signature" under c=relaxed);
+ * - folded continuation lines (CRLF followed by SP or HTAB) belong to the field;
+ * - the returned length excludes the CRLF that terminates the field.
+ *
+ * Indices are byte offsets: the header is decoded as latin1 so that every byte is one string index,
+ * even when the header contains non-ASCII (e.g. raw UTF-8) bytes.
+ *
  * @param header - the header to search for the field in
  * @param headerField - the field name to search for
+ * @param occurrence - which matching field to return. Use "last" for "dkim-signature": DKIM appends
+ *                     the signature being verified as the last field of the signed header, after any
+ *                     other DKIM-Signature fields listed in its h= tag.
  * @returns - the index and length of the field in the header
  */
 export function getHeaderSequence(
   header: Buffer,
-  headerField: string
+  headerField: string,
+  occurrence: "first" | "last" = "first"
 ): Sequence {
-  const regex = new RegExp(
-    `[${headerField[0].toUpperCase()}${headerField[0].toLowerCase()}]${headerField
-      .slice(1)
-      .toLowerCase()}:.*(?:\r?\n)?`
-  );
-  const match = header.toString().match(regex);
-  if (match === null) throw new Error(`Field "${headerField}" not found in header`);
+  const headerStr = header.toString("latin1");
+  const lowerHeader = headerStr.toLowerCase();
+  const prefix = `${headerField.toLowerCase()}:`;
+  let index = -1;
+  let lineStart = 0;
+  while (lineStart !== -1) {
+    if (lowerHeader.startsWith(prefix, lineStart)) {
+      index = lineStart;
+      if (occurrence === "first") break;
+    }
+    const lineEnd = headerStr.indexOf("\r\n", lineStart);
+    lineStart = lineEnd === -1 ? -1 : lineEnd + 2;
+  }
+  if (index === -1) throw new Error(`Field "${headerField}" not found in header`);
+  // the field ends at the first CRLF that is not followed by SP / HTAB (a fold), or at the header end
+  let end = headerStr.length;
+  for (let i = headerStr.indexOf("\r\n", index); i !== -1; i = headerStr.indexOf("\r\n", i + 2)) {
+    const next = headerStr[i + 2];
+    if (next !== " " && next !== "\t") {
+      end = i;
+      break;
+    }
+  }
   return {
-    index: match.index!.toString(),
-    length: match[0].length.toString(),
+    index: index.toString(),
+    length: (end - index).toString(),
   };
 }
 
