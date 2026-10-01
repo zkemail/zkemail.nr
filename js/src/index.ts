@@ -13,14 +13,14 @@ import {
 import * as NoirBignum from "@mach-34/noir-bignum-paramgen";
 import {
   u8ToU32,
-  getHeaderSequence,
+  getVerifiedDkimSignatureSequence,
   getAddressHeaderSequence,
   Sequence,
   BoundedVec,
 } from "./utils";
 
 export { verifyDKIMSignature } from "@zk-email/helpers/dist/dkim";
-export { hashRSAPublicKey } from "./utils";
+export { hashRSAPublicKey, getVerifiedDkimSignatureSequence } from "./utils";
 export type { RSAPublicKeyHashes } from "./utils";
 
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
@@ -130,8 +130,13 @@ export function generateEmailVerifierInputsFromDKIMResult(
     params.maxHeadersLength || MAX_HEADER_PADDED_BYTES
   );
 
-  // the DKIM-Signature being verified is the last one in the signed header (see getHeaderSequence)
-  const dkimHeaderSequence = getHeaderSequence(headers, "dkim-signature", "last");
+  // the field of the DKIM-Signature that was verified (the header may hold several)
+  const verifiedDkim = getVerifiedDkimSignatureSequence(headers, {
+    signingDomain: dkimResult.signingDomain,
+    selector: dkimResult.selector,
+    bodyHash: params.ignoreBodyHashCheck ? undefined : bodyHash,
+  });
+  const dkimHeaderSequence = verifiedDkim.sequence;
 
   // set inputs used in all cases
   const circuitInputs: CircuitInput = {
@@ -157,11 +162,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
       );
     }
 
-    // NOTE: search inside the DKIM-Signature field (latin1 keeps byte offsets), not the whole
-    // header, so a header that happens to contain the same base64 text earlier is not picked.
-    const bodyHashIndex = headers
-      .toString("latin1")
-      .indexOf(bodyHash, Number(dkimHeaderSequence.index));
+    const { bodyHashIndex } = verifiedDkim;
     const maxBodyLength = params.maxBodyLength || MAX_BODY_PADDED_BYTES;
 
     // 65 comes from the 64 at the end and the 1 bit in the start, then 63 comes from the formula to round it up to the nearest 64.
