@@ -770,6 +770,167 @@ mod test_header_field_boundaries {
     }
 }
 
+// Attempts to make get_body_hash read a sender-controlled "bh=" (Subject, other ';'-separated
+// fields, z= copies) instead of the signer's body hash.
+mod test_body_hash_injection {
+    use crate::{headers::body_hash::get_body_hash, Sequence};
+
+    // sha256("") = e3b0c442...b855, base64 "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
+    global EMPTY_BODY_HASH: [u8; 32] = [
+        0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9,
+        0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52,
+        0xb8, 0x55,
+    ];
+
+    // A ';bh=' in Subject is outside the DKIM-Signature field.
+    #[test(should_fail_with = "Body hash index accessed outside of DKIM header field")]
+    fn test_subject_semicolon_bh_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "subject:hi;bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 61, length: 71 }, 14);
+    }
+
+    // Claiming the Subject line is the DKIM-Signature field fails the name check.
+    #[test(should_fail_with = "Header field name does not match")]
+    fn test_subject_claimed_as_dkim_field_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "subject:hi;bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 59 }, 14);
+    }
+
+    // A 'dkim-signature:' written inside the Subject value does not start a line.
+    #[test(should_fail_with = "Header field must start with CRLF")]
+    fn test_dkim_name_inside_subject_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "subject:x;dkim-signature:bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 10, length: 63 }, 28);
+    }
+
+    // c=simple: a folded Subject continuation starts with WSP, so it can't be named dkim-signature.
+    #[test(should_fail_with = "Header field name does not match")]
+    fn test_dkim_name_in_folded_subject_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "Subject: x;\r\n dkim-signature:bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\nDKIM-Signature: v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 13, length: 64 }, 32);
+    }
+
+    // Content-Type also carries '; '-separated parameters; the DKIM field can't be stretched over it.
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_dkim_field_extended_into_content_type_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=\r\ncontent-type:text/plain; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;"
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 146 }, 101);
+    }
+
+    // Signature-like fields with other names (X-Google-DKIM-Signature, ARC-Message-Signature) are not DKIM-Signature.
+    #[test(should_fail_with = "Header field must start with CRLF")]
+    fn test_x_google_dkim_signature_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "x-google-dkim-signature:v=1; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; b=\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 9, length: 71 }, 32);
+    }
+
+    #[test(should_fail_with = "Header field name does not match")]
+    fn test_arc_message_signature_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "arc-message-signature:i=1; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; b=\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 78 }, 30);
+    }
+
+    // z= copies sender-controlled header fields into the DKIM-Signature, '=' escaped as =3D. A copied
+    // field whose name ends in 'e' (Date, Content-Type) produces 'e:bh=', which used to pass as the
+    // 'dkim-signature:bh=' first-tag prefix. (The literal trailing '=' here would be escaped by a real
+    // signer, so this pins the prefix rule rather than reproducing an end-to-end exploit.)
+    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
+    fn test_z_tag_copied_date_bh_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; z=Date:bh=3DsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 127 }, 30);
+    }
+
+    // The real bh= is still found when z= is present.
+    #[test]
+    fn test_body_hash_with_z_tag_accepted() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; z=Date:bh=3DsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 0, length: 127 }, 79);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    // c=simple keeps an all-caps name; bh= as the first tag is still found.
+    #[test]
+    fn test_body_hash_first_tag_uppercase_name_accepted() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "DKIM-SIGNATURE:bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=".as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 0, length: 66 }, 18);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    // The old check OR-ed "e:bh=" and ": bh=" byte by byte, so mixes like "::bh=" and "e bh="
+    // also passed, anywhere in the field. Each form is now matched whole, at its anchored position.
+    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
+    fn test_body_hash_first_tag_off_anchor_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature::bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=".as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 67 }, 19);
+    }
+
+    // Two DKIM-Signature fields in the signed header still work: bh= comes from the last one.
+    #[test]
+    fn test_last_dkim_signature_accepted() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; b=\r\nsubject:hi\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 85, length: 71 }, 108);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+}
+
 mod test_masking {
     use crate::masking::mask_text;
 
