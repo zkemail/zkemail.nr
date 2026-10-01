@@ -40,22 +40,39 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
         body_hash_index + BODY_HASH_BASE64_LENGTH < dkim_header_field_sequence.end_index() + 1;
     assert(start_range & end_range, "Body hash index accessed outside of DKIM header field");
 
+    // REASON: the signature being verified is hashed last, without a trailing CRLF (RFC 6376
+    // s3.7). Any earlier DKIM-Signature in the signed header came from the message, so a sender
+    // can write it (signers may list dkim-signature in h=) with any bh=. Without this check the
+    // prover could point dkim_header_field_sequence at that field and use its body hash.
+    assert(
+        dkim_header_field_sequence.end_index() == header.len(),
+        "DKIM-Signature must be the last header field",
+    );
+
     // check bh prefix: "bh=" must start a tag, i.e. follow the field's ':' or a tag-separating ';',
     // optionally with one space or a fold (CRLF + SP/HTAB, kept by c=simple canonicalization).
     let bh_prefix_first_no_space: [u8; 5] = comptime { "e:bh=".as_bytes() };
     let bh_prefix_space: [u8; 5] = comptime { ": bh=".as_bytes() };
     let bh_prefix_subsequent: [u8; 5] = comptime { "; bh=".as_bytes() };
-    let mut found_first = true;
+    let mut found_first_no_space = true;
+    let mut found_first_space = true;
     let mut found_subsequent = true;
     for i in 0..5 {
         let character = header.get_unchecked(body_hash_index - 5 + i);
-        let match_first_no_space = character == bh_prefix_first_no_space[i];
-        let match_first_space = character == bh_prefix_space[i];
-        let match_first = match_first_no_space | match_first_space;
-        found_first = found_first & match_first;
+        found_first_no_space = found_first_no_space & (character == bh_prefix_first_no_space[i]);
+        found_first_space = found_first_space & (character == bh_prefix_space[i]);
         let match_subsequent = character == bh_prefix_subsequent[i];
         found_subsequent = found_subsequent & match_subsequent;
     }
+    // REASON: "e:bh=" / ": bh=" only mean "first tag" right after the "dkim-signature:" name.
+    // ':' is legal inside tag values: z= copies sender-controlled header fields as "Name:value"
+    // with '=' escaped as "=3D", so a copied "Date:bh..." reads "e:bh=3D..." mid-field, and the
+    // unanchored 5-byte check matched it. NOTE: defense in depth. A real z= value can't end its 44
+    // bytes with the literal '=' padding the base64 decoder requires followed by ';', so this was
+    // not reachable end to end; the anchor makes the check mean what it says.
+    let name_end = dkim_header_field_sequence.index + 15; // "dkim-signature:" is 15 bytes
+    let found_first = (found_first_no_space & (body_hash_index == name_end + 3))
+        | (found_first_space & (body_hash_index == name_end + 4));
     // ";bh=" (no space after the separator)
     let bh_prefix_no_space: [u8; 4] = comptime { ";bh=".as_bytes() };
     let mut found_no_space = true;
