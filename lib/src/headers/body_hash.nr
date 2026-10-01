@@ -34,13 +34,25 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
         dkim_header_field_sequence,
         header_field_name,
     );
+    // REASON: the DKIM-Signature being verified is always the LAST field of the signed header:
+    // RFC 6376 s3.7 appends it, canonicalized and with b= emptied, after the h= fields and without a
+    // trailing CRLF (helpers' mailauth builds the buffer the same way). Other DKIM-Signature fields
+    // can only appear earlier, when listed in h= (e.g. a second d=*.gappssmtp.com or ESP
+    // signature). Their bh= was computed for their own c= / l= tags, not for the verified signature,
+    // so it must not be usable here. Requiring the field to end the header pins it to the verified
+    // signature; it never rejects an honestly generated input.
+    assert(
+        dkim_header_field_sequence.end_index() == header.len(),
+        "DKIM-Signature field must be the last header field",
+    );
     // constrain access to the body hash
     let start_range = body_hash_index > dkim_header_field_sequence.index;
     let end_range =
         body_hash_index + BODY_HASH_BASE64_LENGTH < dkim_header_field_sequence.end_index() + 1;
     assert(start_range & end_range, "Body hash index accessed outside of DKIM header field");
 
-    // check bh prefix
+    // check bh prefix: "bh=" must start a tag, i.e. follow the field's ':' or a tag-separating ';',
+    // optionally with one space or a fold (CRLF + SP/HTAB, kept by c=simple canonicalization).
     let bh_prefix_first_no_space: [u8; 5] = comptime { "e:bh=".as_bytes() };
     let bh_prefix_space: [u8; 5] = comptime { ": bh=".as_bytes() };
     let bh_prefix_subsequent: [u8; 5] = comptime { "; bh=".as_bytes() };
@@ -55,7 +67,29 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
         let match_subsequent = character == bh_prefix_subsequent[i];
         found_subsequent = found_subsequent & match_subsequent;
     }
-    assert(found_first | found_subsequent, "No ':bh=' or '; bh=' prefix found before body hash");
+    // ";bh=" (no space after the separator)
+    let bh_prefix_no_space: [u8; 4] = comptime { ";bh=".as_bytes() };
+    let mut found_no_space = true;
+    for i in 0..4 {
+        found_no_space = found_no_space
+            & (header.get_unchecked(body_hash_index - 4 + i) == bh_prefix_no_space[i]);
+    }
+    // ";\r\n\tbh=" / ";\r\n bh=" (folded after the separator)
+    // NOTE: these 7 bytes can't start before the field: "bh=" can't overlap the 15-byte
+    // "dkim-signature:" name (checked above), so body_hash_index - 7 >= field index + 11. A
+    // body_hash_index too small for the subtraction makes the circuit fail, never pass.
+    let bh_prefix_folded_tab: [u8; 7] = comptime { ";\r\n\tbh=".as_bytes() };
+    let bh_prefix_folded_space: [u8; 7] = comptime { ";\r\n bh=".as_bytes() };
+    let mut found_folded = true;
+    for i in 0..7 {
+        let character = header.get_unchecked(body_hash_index - 7 + i);
+        found_folded = found_folded
+            & ((character == bh_prefix_folded_tab[i]) | (character == bh_prefix_folded_space[i]));
+    }
+    assert(
+        found_first | found_subsequent | found_no_space | found_folded,
+        "No ':bh=' or '; bh=' prefix found before body hash",
+    );
 
     // check that bh is followed by ;
     let bh_suffix: u8 = comptime { ";".as_bytes()[0] };

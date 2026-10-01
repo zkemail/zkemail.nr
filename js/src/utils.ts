@@ -63,26 +63,130 @@ export function toProverToml(inputs: any): string {
 }
 
 /**
+ * Find every field named `headerField` in a canonicalized header, as [start, end) byte offsets.
+ *
+ * Matches the circuit's `constrain_header_field`:
+ * - the field name is matched case-insensitively at the start of a header line ("DKIM-Signature"
+ *   under c=simple canonicalization, "dkim-signature" under c=relaxed);
+ * - folded continuation lines (CRLF followed by SP or HTAB) belong to the field;
+ * - `end` excludes the CRLF that terminates the field.
+ *
+ * NOTE: the header is decoded as latin1 so every byte is one string index. The default utf8 decoding
+ * shifts every later offset when the header contains non-ASCII bytes.
+ */
+function findHeaderFields(header: Buffer, headerField: string): { index: number; end: number }[] {
+  const headerStr = header.toString("latin1");
+  const lowerHeader = headerStr.toLowerCase();
+  const prefix = `${headerField.toLowerCase()}:`;
+  const fields: { index: number; end: number }[] = [];
+  let lineStart = 0;
+  while (lineStart !== -1) {
+    if (lowerHeader.startsWith(prefix, lineStart)) {
+      // the field ends at the first CRLF not followed by SP / HTAB (a fold), or at the header end
+      let end = headerStr.length;
+      for (let i = headerStr.indexOf("\r\n", lineStart); i !== -1; i = headerStr.indexOf("\r\n", i + 2)) {
+        const next = headerStr[i + 2];
+        if (next !== " " && next !== "\t") {
+          end = i;
+          break;
+        }
+      }
+      fields.push({ index: lineStart, end });
+    }
+    const lineEnd = headerStr.indexOf("\r\n", lineStart);
+    lineStart = lineEnd === -1 ? -1 : lineEnd + 2;
+  }
+  return fields;
+}
+
+/**
  * Get the index and length of a header field to use
+ *
+ * See findHeaderFields for how fields are matched. For the DKIM-Signature field use
+ * getVerifiedDkimSignatureSequence instead: a header can carry several DKIM-Signature fields.
  *
  * @param header - the header to search for the field in
  * @param headerField - the field name to search for
+ * @param occurrence - which matching field to return when the field occurs more than once
  * @returns - the index and length of the field in the header
  */
 export function getHeaderSequence(
   header: Buffer,
-  headerField: string
+  headerField: string,
+  occurrence: "first" | "last" = "first"
 ): Sequence {
-  const regex = new RegExp(
-    `[${headerField[0].toUpperCase()}${headerField[0].toLowerCase()}]${headerField
-      .slice(1)
-      .toLowerCase()}:.*(?:\r?\n)?`
-  );
-  const match = header.toString().match(regex);
-  if (match === null) throw new Error(`Field "${headerField}" not found in header`);
+  const fields = findHeaderFields(header, headerField);
+  if (fields.length === 0) throw new Error(`Field "${headerField}" not found in header`);
+  const field = occurrence === "first" ? fields[0] : fields[fields.length - 1];
   return {
-    index: match.index!.toString(),
-    length: match[0].length.toString(),
+    index: field.index.toString(),
+    length: (field.end - field.index).toString(),
+  };
+}
+
+/** Tags of a DKIM-Signature field value, with folding whitespace removed (RFC 6376 s3.2). */
+function parseDkimTags(fieldValue: string): Map<string, string> {
+  const tags = new Map<string, string>();
+  for (const part of fieldValue.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq !== -1) {
+      tags.set(part.slice(0, eq).replace(/[\s]/g, "").toLowerCase(), part.slice(eq + 1).replace(/[\s]/g, ""));
+    }
+  }
+  return tags;
+}
+
+/**
+ * Locate the DKIM-Signature field that helpers' verifyDKIMSignature actually verified, and the index
+ * of its bh= value, in the canonicalized signed header (`DKIMVerificationResult.headers`).
+ *
+ * REASON: the canonicalized header can contain more than one DKIM-Signature field. Besides the
+ * verified one, any other DKIM-Signature listed in its h= tag is included (e.g. Google Workspace
+ * signs with both d=<domain> and d=<domain>.<date>.gappssmtp.com; ESPs add their own d=). The
+ * circuit must use the field of the verified signature, so it is picked by content, not position:
+ * - d= and s= equal the verified result's signingDomain / selector,
+ * - bh= equals the verified body hash (when known),
+ * - b= is empty: the verifier empties b= of the signature it verifies (RFC 6376 s3.7), while
+ *   other DKIM-Signature fields keep theirs,
+ * - it is the last field of the header. RFC 6376 s3.7 appends the verified signature last, and the
+ *   circuit's get_body_hash requires that.
+ * Exactly one field must satisfy all of these; anything else is an error rather than a guess.
+ */
+export function getVerifiedDkimSignatureSequence(
+  header: Buffer,
+  verified: { signingDomain: string; selector: string; bodyHash?: string }
+): { sequence: Sequence; bodyHashIndex: number } {
+  const headerStr = header.toString("latin1");
+  const candidates = findHeaderFields(header, "dkim-signature").filter(({ index, end }) => {
+    const tags = parseDkimTags(headerStr.slice(index + "dkim-signature:".length, end));
+    return (
+      tags.get("d")?.toLowerCase() === verified.signingDomain.toLowerCase() &&
+      tags.get("s")?.toLowerCase() === verified.selector.toLowerCase() &&
+      (verified.bodyHash === undefined || tags.get("bh") === verified.bodyHash) &&
+      tags.get("b") === ""
+    );
+  });
+  if (candidates.length !== 1) {
+    throw new Error(
+      `Expected exactly one DKIM-Signature field for d=${verified.signingDomain} s=${verified.selector} with an empty b=, found ${candidates.length}`
+    );
+  }
+  const { index, end } = candidates[0];
+  if (end !== headerStr.length) {
+    throw new Error("The verified DKIM-Signature field is not the last field of the signed header");
+  }
+  // bh= must start a tag in one of the forms the circuit accepts (headers/body_hash.nr)
+  const field = headerStr.slice(index, end);
+  const match = /(?::|; ?|;\r\n[ \t])bh=/i.exec(field);
+  if (match === null) throw new Error("bh= tag not found in a position the circuit accepts");
+  const bodyHashIndex = index + match.index + match[0].length;
+  if (verified.bodyHash !== undefined && headerStr.slice(bodyHashIndex, bodyHashIndex + 44) !== verified.bodyHash) {
+    // e.g. a bh= value folded across lines: the circuit reads 44 contiguous bytes
+    throw new Error("bh= value is not stored contiguously after the tag");
+  }
+  return {
+    sequence: { index: index.toString(), length: (end - index).toString() },
+    bodyHashIndex,
   };
 }
 
