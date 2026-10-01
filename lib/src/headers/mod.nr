@@ -18,9 +18,24 @@ fn check_header_field_bounds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LE
     header_field_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) {
+    // REASON: the expected name must itself be a valid field name (printable ASCII except ':',
+    // RFC 5322 s2.2). A name containing ':' or CRLF would let the "name" swallow part of a field
+    // value or a line break (Consensys Diligence v1 audit, finding 5.3). Free for constant names.
+    assert(HEADER_FIELD_NAME_LENGTH != 0, "Header field name must not be empty");
+    for i in 0..HEADER_FIELD_NAME_LENGTH {
+        let c = header_field_name[i];
+        assert((c >= 0x21) & (c <= 0x7e) & (c != 0x3a), "Invalid header field name");
+    }
+
     // check the range of the sequence is within the header (so we can use get_unchecked)
     let end_index = header_field_sequence.end_index();
     assert(end_index <= header.len(), "Header field out of bounds of header");
+
+    // NOTE: the sequence must at least hold "<name>:" (Consensys v1 audit, finding 5.4).
+    assert(
+        header_field_sequence.length > HEADER_FIELD_NAME_LENGTH,
+        "Header field too short to contain name and colon",
+    );
 
     // REASON: the callers' "no line break inside the field" loops start right after
     // "<name>:" and only scan MAX_HEADER_FIELD_LENGTH bytes. Without this bound, bytes of a longer
@@ -43,10 +58,20 @@ fn check_header_field_bounds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LE
         );
     }
 
-    // if the sequence is not the end, check for a newline
+    // if the sequence is not the end, check for a newline that really ends the field
     if end_index != header.len() {
         assert(header.get_unchecked(end_index) == CR, "Header field must end with CRLF");
         assert(header.get_unchecked(end_index + 1) == LF, "Header field must end with CRLF");
+        // REASON: a CRLF followed by SP/HTAB is a fold, i.e. the same field continues on the next
+        // line (kept by c=simple canonicalization). Ending the sequence there would let a prover
+        // claim only the first line(s) of a folded field as the whole field (Consensys v1 audit,
+        // finding 5.1, Critical). relaxed canonicalization never produces a fold, so this rejects
+        // no relaxed header. When end_index + 2 == len there is no next line (the byte there is
+        // padding), so it is not read.
+        if end_index + 2 < header.len() {
+            let next = header.get_unchecked(end_index + 2);
+            assert((next != 0x20) & (next != 0x09), "Header field must not end inside a fold");
+        }
     }
 
     // check that the header field name matches the expected name, ignoring ASCII case.

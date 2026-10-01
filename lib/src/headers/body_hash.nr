@@ -34,6 +34,17 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
         dkim_header_field_sequence,
         header_field_name,
     );
+    // REASON: the DKIM-Signature being verified is always the LAST field of the signed header:
+    // RFC 6376 s3.7 appends it, canonicalized and with b= emptied, after the h= fields and without a
+    // trailing CRLF (helpers' mailauth builds the buffer the same way). Other DKIM-Signature fields
+    // can only appear earlier, when listed in h= (e.g. a second d=*.gappssmtp.com or ESP
+    // signature). Their bh= was computed for their own c= / l= tags, not for the verified signature,
+    // so it must not be usable here. Requiring the field to end the header pins it to the verified
+    // signature; it never rejects an honestly generated input.
+    assert(
+        dkim_header_field_sequence.end_index() == header.len(),
+        "DKIM-Signature field must be the last header field",
+    );
     // constrain access to the body hash
     let start_range = body_hash_index > dkim_header_field_sequence.index;
     let end_range =
