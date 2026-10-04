@@ -56,17 +56,30 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     let bh_prefix_first_no_space: [u8; 5] = comptime { "e:bh=".as_bytes() };
     let bh_prefix_space: [u8; 5] = comptime { ": bh=".as_bytes() };
     let bh_prefix_subsequent: [u8; 5] = comptime { "; bh=".as_bytes() };
-    let mut found_first = true;
+    let mut found_first_no_space = true;
+    let mut found_first_space = true;
     let mut found_subsequent = true;
     for i in 0..5 {
         let character = header.get_unchecked(body_hash_index - 5 + i);
-        let match_first_no_space = character == bh_prefix_first_no_space[i];
-        let match_first_space = character == bh_prefix_space[i];
-        let match_first = match_first_no_space | match_first_space;
-        found_first = found_first & match_first;
+        // NOTE: byte 0 ('e') is skipped. At the anchored position below it is the last byte of the
+        // name, already matched case-insensitively, and c=simple keeps e.g. "DKIM-SIGNATURE:bh=",
+        // which an exact lowercase 'e' rejected.
+        found_first_no_space =
+            found_first_no_space & ((i == 0) | (character == bh_prefix_first_no_space[i]));
+        found_first_space = found_first_space & (character == bh_prefix_space[i]);
         let match_subsequent = character == bh_prefix_subsequent[i];
         found_subsequent = found_subsequent & match_subsequent;
     }
+    // REASON: ":bh=" / ": bh=" only mean "first tag" right after the "dkim-signature:" name.
+    // ':' is legal inside tag values: z= copies sender-controlled header fields as "Name:value"
+    // with '=' escaped as "=3D", so a copied "Date:bh..." reads "e:bh=3D..." mid-field, and the
+    // unanchored 5-byte check matched it. NOTE: defense in depth. A real z= value can't end its 44
+    // bytes with the literal '=' padding the base64 decoder requires followed by ';', so this was
+    // not reachable end to end; the anchor makes the check mean what it says. The two forms are
+    // also matched as separate flags: OR-ing them per byte accepted mixes such as "::bh=".
+    let name_end = dkim_header_field_sequence.index + 15; // "dkim-signature:" is 15 bytes
+    let found_first = (found_first_no_space & (body_hash_index == name_end + 3))
+        | (found_first_space & (body_hash_index == name_end + 4));
     // ";bh=" (no space after the separator)
     let bh_prefix_no_space: [u8; 4] = comptime { ";bh=".as_bytes() };
     let mut found_no_space = true;
