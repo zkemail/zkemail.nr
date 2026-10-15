@@ -5,9 +5,11 @@ on:
     branches:
       - main
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
   test:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     name: Test on Nargo ${{matrix.toolchain}}
     runs-on: ubuntu-latest
     strategy:
@@ -28,6 +30,7 @@ jobs:
         run: nargo test
 
   format:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -43,6 +46,7 @@ jobs:
         run: nargo fmt --check
 
   check-char-table:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     name: check-char-table
     runs-on: ubuntu-latest
     steps:
@@ -58,17 +62,40 @@ jobs:
         working-directory: ./js
         run: node scripts/check-char-table-sync.js
 
+  javascript:
+    name: JavaScript security regressions
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install locked dependencies
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn install --frozen-lockfile
+      - name: Build and lint
+        run: yarn build && yarn lint
+      - name: Run synthetic security regressions
+        run: yarn test tests/address-sequence.test.ts tests/dkim-tag-boundaries.test.ts tests/header-sequence.test.ts tests/redc-bound.test.ts --runInBand
+
   # This is a job which depends on all test jobs and reports the overall status.
   # This allows us to add/remove test jobs without having to update the required workflows.
   tests-end:
     name: Noir End
     runs-on: ubuntu-latest
     # We want this job to always run (even if the dependant jobs fail) as we want this job to fail rather than skipping.
-    if: ${{ always() }}
+    if: ${{ always() && (github.event_name == 'push' || github.event.pull_request.draft == false) }}
     needs:
       - test
       - format
       - check-char-table
+      - javascript
 
     steps:
       - name: Report overall success

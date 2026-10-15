@@ -130,7 +130,9 @@ function parseDkimTags(fieldValue: string): Map<string, string> {
   for (const part of fieldValue.split(";")) {
     const eq = part.indexOf("=");
     if (eq !== -1) {
-      tags.set(part.slice(0, eq).replace(/[\s]/g, "").toLowerCase(), part.slice(eq + 1).replace(/[\s]/g, ""));
+      const name = part.slice(0, eq).replace(/[\s]/g, "").toLowerCase();
+      if (tags.has(name)) throw new Error("Duplicate DKIM tag");
+      tags.set(name, part.slice(eq + 1).replace(/[\s]/g, ""));
     }
   }
   return tags;
@@ -177,7 +179,9 @@ export function getVerifiedDkimSignatureSequence(
   }
   // bh= must start a tag in one of the forms the circuit accepts (headers/body_hash.nr)
   const field = headerStr.slice(index, end);
-  const match = /(?::|; ?|;\r\n[ \t])bh=/i.exec(field);
+  // A colon is a delimiter only at the end of the field name. A z= copied header may
+  // contain ':bh=' inside its value; selecting it produces a different index than the circuit.
+  const match = /^(?:dkim-signature: ?)bh=|(?:; ?|;\r\n[ \t])bh=/i.exec(field);
   if (match === null) throw new Error("bh= tag not found in a position the circuit accepts");
   const bodyHashIndex = index + match.index + match[0].length;
   if (verified.bodyHash !== undefined && headerStr.slice(bodyHashIndex, bodyHashIndex + 44) !== verified.bodyHash) {
@@ -199,20 +203,37 @@ export function getVerifiedDkimSignatureSequence(
  * @returns - the index and length of the field in the header and the index and length of the address in the field
  */
 export function getAddressHeaderSequence(header: Buffer, headerField: string) {
-  const regexPrefix = `[${headerField[0].toUpperCase()}${headerField[0].toLowerCase()}]${headerField
-    .slice(1)
-    .toLowerCase()}`;
-  const regex = new RegExp(
-    `${regexPrefix}:.*?<([^>]+)>|${regexPrefix}:.*?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,})`
-  );
-  const headerStr = header.toString();
-  const match = headerStr.match(regex);
-  if (match === null) throw new Error(`Field "${headerField}" not found in header`);
-  if (match[1] === null && match[2] === null) throw new Error(`Address not found in "${headerField}" field`);
-  const address = match[1] || match[2];
-  const addressIndex = headerStr.indexOf(address);
+  const name = headerField.toLowerCase();
+  if (name !== "from" && name !== "to") throw new Error("Only From and To address extraction is supported");
+  const fields = findHeaderFields(header, name);
+  if (fields.length !== 1) throw new Error(`Expected exactly one "${name}" field`);
+  const { index, end } = fields[0];
+  // Use byte offsets, the complete field (including folds/comments), and only search its value.
+  // Searching the entire header can select a lookalike in Subject or an earlier repeated address.
+  const valueStart = index + name.length + 1;
+  const value = header.subarray(valueStart, end).toString("latin1");
+  const bracket = value.lastIndexOf("<");
+  let offset: number;
+  let address: string;
+  if (bracket !== -1) {
+    offset = bracket + 1;
+    const close = value.indexOf(">", offset);
+    if (close === -1) throw new Error("Address is missing a closing angle bracket");
+    address = value.slice(offset, close);
+    // Multiple mailboxes cannot establish an unambiguous single-address claim.
+    if (value.slice(0, bracket).includes(">") || value.slice(close + 1).includes("@")) {
+      throw new Error("Multiple addresses are not supported");
+    }
+  } else {
+    address = value.trim();
+    offset = value.indexOf(address);
+  }
+  // Match the circuit's intentionally restricted character set; do not silently extract a
+  // supported-looking suffix from unsupported syntax (e.g. the tail of a plus-address).
+  if (!/^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$/.test(address)) throw new Error("Unsupported address syntax");
+  const addressIndex = valueStart + offset;
   return [
-    { index: match.index!.toString(), length: match[0].length.toString() },
+    { index: index.toString(), length: (end - index).toString() },
     { index: addressIndex.toString(), length: address.length.toString() },
   ];
 }
