@@ -160,7 +160,14 @@ export function getVerifiedDkimSignatureSequence(
 ): { sequence: Sequence; bodyHashIndex: number } {
   const headerStr = header.toString("latin1");
   const candidates = findHeaderFields(header, "dkim-signature").filter(({ index, end }) => {
-    const tags = parseDkimTags(headerStr.slice(index + "dkim-signature:".length, end));
+    let tags: Map<string, string>;
+    try {
+      tags = parseDkimTags(headerStr.slice(index + "dkim-signature:".length, end));
+    } catch {
+      // A malformed unrelated signature may itself be signed by the valid final signature.
+      // It cannot be a candidate, but must not prevent selecting the verified field.
+      return false;
+    }
     return (
       tags.get("d")?.toLowerCase() === verified.signingDomain.toLowerCase() &&
       tags.get("s")?.toLowerCase() === verified.selector.toLowerCase() &&

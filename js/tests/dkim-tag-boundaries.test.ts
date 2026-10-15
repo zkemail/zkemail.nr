@@ -26,4 +26,9 @@ describe("DKIM helper tag boundaries agree with the circuit", () => {
   it("does not allow malformed duplicate bh tags when body checking is omitted", () => {
     expect(() => select(`dkim-signature:d=example.org; s=sel; bh=${bodyHash}; bh=${bodyHash}; b=`, false)).toThrow();
   });
+  it.each(["d=other.example", "s=x", `bh=${bodyHash}`, "b=old"])("ignores unrelated malformed signatures with duplicate %j", (duplicate) => {
+    const prefix = `dkim-signature:d=other.example; s=x; bh=${bodyHash}; b=old; ${duplicate}\r\n`;
+    const valid = `dkim-signature:d=example.org; s=sel; bh=${bodyHash}; b=`;
+    expect(select(prefix + valid).sequence.index).toBe(String(prefix.length));
+  });
 });
