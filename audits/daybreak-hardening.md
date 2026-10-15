@@ -32,3 +32,26 @@
 - Baseline at `08c755e`: `nargo test` **84/84 passed** with official Nargo/noirc `1.0.0-beta.5` (`c651df6e2bf5db3966aa0c95abea2fc4c69d4513`), downloaded only to `/tmp/zkemail-daybreak-20261014/tools`.
 - Before fixes: three address regressions failed as expected; the authenticated-tail `bh=` regression separately failed as expected. After fixes: `nargo test` **97/97 passed**, `nargo fmt --check` passed, and `nargo check` passed for all six examples. The repository pins JS `@noir-lang/noir_js`/`@noir-lang/noirc_abi` to `1.0.0-beta.5` and `@aztec/bb.js` to `0.84.0`; JS behavior was inspected but its suite was not run in this owned task.
 - These are Noir interpreter and compile results, not full proof generation/verification, browser behavior, or production deployment. The private corpus findings and complementary JS checks belong to the parent investigation. No all-secure verdict is implied.
+
+## Combined JavaScript and private-corpus follow-up
+
+The parent investigator integrated this work with byte-safe JavaScript address extraction and DKIM tag selection. The combined implementation is at `ac6586e159123868e2a12c25edc2f8293ca227ed` before this documentation update.
+
+- `getAddressHeaderSequence` searched the entire UTF-8-decoded header with an unanchored regex, then searched globally again for the address. A Node inspector breakpoint on the unchanged implementation observed field start **23**, returned address offset **8** (in Subject), and correct address offset **29**. Other cases truncated fields at the address, ignored folded continuations, or mistook a Subject value for From. The fix resolves one complete, case-insensitive From/To field, computes offsets in bytes within that field, and rejects ambiguous or unsupported mailbox syntax. Circuit bounds generally rejected the wrong offsets; this was not a demonstrated signature bypass.
+- JavaScript's `bh=` regex could select a colon inside a copied `z=` value, disagreeing with #68's circuit fix. It now anchors the field-name colon, supports the circuit's first-tag prefixes, and rejects duplicate DKIM tags instead of silently overwriting them. This corrects input generation and rejects ambiguity; it does not add a complete DKIM parser to the circuit.
+- On the unchanged JavaScript implementation, **15 of 19** new address tests and **8 of 14** new tag-boundary tests failed. With fixes, **46/46** focused JavaScript tests pass, including existing signature-selection and RSA/redc tests. Locked Yarn dependencies, TypeScript build, and ESLint were checked. CI now runs these synthetic tests; draft PR jobs skip development updates and run on `ready_for_review`.
+
+Offline private-corpus check, with no DNS queries, authentication, proving, private filenames, addresses, subjects, or raw messages in its output:
+
+| Measurement | Result |
+| --- | --- |
+| Emails examined | 132: 57 with one signature, 72 with two, 3 unsigned |
+| DKIM signatures examined | 201, including 62 with repeated `h=` names |
+| Signature selections compatible with the helper | 199; 2 rejected because the body hash is not contiguous |
+| Address extractions structurally compatible before / after | 364 / 396 |
+| Wrong field extents / out-of-field offsets before | 31 / 5 |
+| Wrong field extents / out-of-field offsets after | 0 / 0 |
+| Address helper rejections after | 5 unsupported cases; one additional To field is unsigned |
+| Mutated canonical headers | 1,791 passing helper checks: 1,194 positive offset controls and 597 rejection controls |
+
+Mutations cover no-space and folded Subject `;bh=`, semicolon-bearing Content-Type, non-ASCII prefixes, decoy signatures, ambiguous empty-signature duplicates, appended fields, and mismatched body hashes. They deliberately change canonicalized headers and invalidate their original signatures; these counts measure parser/selection behavior, **not authenticated emails or successful proofs**. Run locally with `cd js && yarn build && node scripts/check-private-corpus.cjs /path/to/emls`. No private fixtures are needed or present in CI.
