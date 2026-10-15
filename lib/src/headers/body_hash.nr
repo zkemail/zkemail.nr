@@ -47,8 +47,10 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     );
     // constrain access to the body hash
     let start_range = body_hash_index > dkim_header_field_sequence.index;
+    // The terminating ';' at index + 44 must also be inside the authenticated field. The storage
+    // array may contain arbitrary bytes after header.len(), including a forged terminator.
     let end_range =
-        body_hash_index + BODY_HASH_BASE64_LENGTH < dkim_header_field_sequence.end_index() + 1;
+        body_hash_index + BODY_HASH_BASE64_LENGTH < dkim_header_field_sequence.end_index();
     assert(start_range & end_range, "Body hash index accessed outside of DKIM header field");
 
     // check bh prefix: "bh=" must start a tag, i.e. follow the field's ':' or a tag-separating ';',

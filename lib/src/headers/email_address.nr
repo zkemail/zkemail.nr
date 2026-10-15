@@ -55,6 +55,7 @@ pub fn parse_email_address<let MAX_HEADER_LENGTH: u32>(
     }
     // check the email address and assign
     let mut email_address: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> = BoundedVec::new();
+    let mut at_count = 0;
     for i in 0..MAX_EMAIL_ADDRESS_LENGTH {
         let index = email_address_sequence.index + i;
         if index < email_address_sequence.end_index() {
@@ -64,9 +65,12 @@ pub fn parse_email_address<let MAX_HEADER_LENGTH: u32>(
                 EMAIL_ADDRESS_CHAR_TABLE[letter] == 1,
                 "Email address must only contain acceptable characters",
             );
+            if letter == 0x40 {
+                at_count += 1;
+            }
         }
     }
+    assert(at_count == 1, "Email address must contain '@' exactly once");
     email_address.len = email_address_sequence.length;
-    // todo: should probably introduce a check for @
     email_address
 }
