@@ -96,12 +96,15 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       });
       // simulate witness
       const result = await proverMasked.simulateWitness(inputs);
-      // compute mask locally
+      // compute mask locally. Bytes at index >= len (here the SHA-256 padding) are never output,
+      // whatever the mask says: the circuit does not constrain them.
+      const headerLen = parseInt(inputs.header.len);
+      const bodyLen = parseInt(inputs.body!.len);
       const expectedMaskedHeader = inputs.header.storage.map((byte, i) =>
-        headerMask[i] === 1 ? parseInt(byte) : 0
+        i < headerLen && headerMask[i] === 1 ? parseInt(byte) : 0
       );
       const expectedMaskedBody = inputs.body!.storage.map((byte, i) =>
-        bodyMask[i] === 1 ? parseInt(byte) : 0
+        i < bodyLen && bodyMask[i] === 1 ? parseInt(byte) : 0
       );
       // compare results
       const acutalMaskedHeader = result.returnValue[1].map((byte) =>

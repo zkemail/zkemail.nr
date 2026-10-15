@@ -14,7 +14,11 @@ global KEY_LIMBS_2048: u32 = 18;
 global BODY_HASH_BASE64_LENGTH: u32 = 44;
 global CR: u8 = 0x0D;
 global LF: u8 = 0x0A;
-global MAX_DKIM_HEADER_FIELD_LENGTH: u32 = 300; // kinda arbitrary but gives > 100 chars for selector and domain
+// NOTE: max length of the DKIM-Signature field value (after "dkim-signature:"); longer fields are
+// rejected by constrain_header_field. Raised from 300: c=simple keeps folds and long h= lists, and
+// real DKIM-Signature fields routinely exceed 300 bytes. Each extra byte costs a few constraints in
+// get_body_hash's line-break scan.
+global MAX_DKIM_HEADER_FIELD_LENGTH: u32 = 1024;
 global MAX_EMAIL_ADDRESS_LENGTH: u32 = 320; // derived via (https://datatracker.ietf.org/doc/html/rfc5321#section-4.5.3.1.1)
 
 pub struct Sequence {

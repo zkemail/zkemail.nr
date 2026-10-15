@@ -121,5 +121,9 @@
       "@typescript-eslint/no-use-before-define": "off",
       "prefer-destructuring": "off"
     }
+  },
+  "resolutions": {
+    "ws": "8.22.0",
+    "underscore": "1.13.8"
   }
 }

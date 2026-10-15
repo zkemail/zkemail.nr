@@ -156,6 +156,28 @@ mod test_redc_binding_2048 {
             "redc hash (hash[1]) must change when redc is modified",
         );
     }
+
+    /// poseidon_large only hashes the low 17 bits of redc[17] (17 x 121-bit repacking), so any
+    /// higher bit set there must be rejected by validate_in_range, or redc would not be bound by
+    /// hash()[1].
+    #[test(should_fail)]
+    fn test_redc_top_limb_bits_outside_hash_are_rejected_2048() {
+        let pubkey = EmailLarge::PUBKEY;
+        let mut tampered_redc = pubkey.redc;
+        tampered_redc[17] = tampered_redc[17] + 131072; // 1 << 17: lowest bit the hash ignores
+        let tampered_pubkey = crate::dkim::RSAPubkey::new(pubkey.modulus, tampered_redc);
+        let _ = tampered_pubkey.hash();
+    }
+
+    /// Guard: the largest top limb the hash covers (17 bits) is still accepted. Honest keys use
+    /// at most 13 bits there (2048-bit modulus, 2^(2k+4) redc; see js/tests/redc-bound.test.ts).
+    #[test]
+    fn test_redc_top_limb_17_bits_accepted_2048() {
+        let pubkey = EmailLarge::PUBKEY;
+        let mut redc = pubkey.redc;
+        redc[17] = 131071; // 2^17 - 1
+        let _ = crate::dkim::RSAPubkey::new(pubkey.modulus, redc).hash();
+    }
 }
 
 mod test_redc_binding_1024 {
@@ -508,5 +530,603 @@ mod test_address_extraction {
             malicious_sequence,
             from,
         );
+    }
+}
+
+// Header-field parsing: case-insensitive names, folded fields (c=simple), field length bound.
+mod test_header_field_canonicalization {
+    use crate::{headers::{body_hash::get_body_hash, constrain_header_field}, Sequence};
+
+    // sha256("") = e3b0c442...b855, base64 "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
+    global EMPTY_BODY_HASH: [u8; 32] = [
+        0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9,
+        0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52,
+        0xb8, 0x55,
+    ];
+
+    #[test]
+    fn test_uppercase_field_name_matches() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "Subject:hi\r\nFrom:a@b.cd\r\nto:x@y.zz".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        constrain_header_field::<64, 16, 4>(header, Sequence { index: 12, length: 11 }, from);
+    }
+
+    #[test(should_fail_with = "Header field name does not match")]
+    fn test_different_field_name_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "Frum:a@b.cd\r\nto:x@y.zz".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        constrain_header_field::<64, 16, 4>(header, Sequence { index: 0, length: 11 }, from);
+    }
+
+    #[test]
+    fn test_folded_field_accepted() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "x-test:a;\r\n\tb;\r\n c\r\nto:x@y.zz".as_bytes() },
+        );
+        let name: [u8; 6] = comptime { "x-test".as_bytes() };
+        constrain_header_field::<64, 32, 6>(header, Sequence { index: 0, length: 18 }, name);
+    }
+
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_line_break_without_fold_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "x-test:a\r\nto:x@y.zz".as_bytes() });
+        let name: [u8; 6] = comptime { "x-test".as_bytes() };
+        constrain_header_field::<64, 32, 6>(header, Sequence { index: 0, length: 19 }, name);
+    }
+
+    // A fold's CRLF + WSP must be inside the field; the bytes after header.len() are unconstrained
+    // padding and must not complete one.
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_fold_completed_by_padding_rejected() {
+        let storage: [u8; 16] = comptime { "x-test:a\r\n zzzzz".as_bytes() };
+        let header: BoundedVec<u8, 16> = BoundedVec::from_parts_unchecked(storage, 9);
+        let name: [u8; 6] = comptime { "x-test".as_bytes() };
+        constrain_header_field::<16, 32, 6>(header, Sequence { index: 0, length: 9 }, name);
+    }
+
+    #[test]
+    fn test_field_at_max_length_accepted() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:abcd".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        constrain_header_field::<64, 4, 4>(header, Sequence { index: 0, length: 9 }, from);
+    }
+
+    // The line-break scan covers MAX_HEADER_FIELD_LENGTH bytes after "<name>:", so a longer
+    // field must be rejected rather than partially checked.
+    #[test(should_fail_with = "Header field too long")]
+    fn test_field_longer_than_scan_window_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:abcdef\r\nto:zz".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        constrain_header_field::<64, 4, 4>(header, Sequence { index: 0, length: 18 }, from);
+    }
+
+    // Same bound on the DKIM-Signature path (MAX_DKIM_HEADER_FIELD_LENGTH = 1024).
+    #[test(should_fail_with = "Header field too long")]
+    fn test_dkim_field_longer_than_max_rejected() {
+        let prefix: [u8; 68] = comptime {
+            "dkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;".as_bytes()
+        };
+        let mut storage: [u8; 1100] = [0x61; 1100];
+        for i in 0..68 {
+            storage[i] = prefix[i];
+        }
+        let header: BoundedVec<u8, 1100> = BoundedVec::from_array(storage);
+        let _ = get_body_hash(header, Sequence { index: 0, length: 1100 }, 23);
+    }
+
+    // Long real-world DKIM-Signature fields (> the old 300-byte window) must still be accepted.
+    #[test]
+    fn test_dkim_field_of_900_bytes_accepted() {
+        let prefix: [u8; 68] = comptime {
+            "dkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;".as_bytes()
+        };
+        let mut storage: [u8; 900] = [0x61; 900];
+        for i in 0..68 {
+            storage[i] = prefix[i];
+        }
+        let header: BoundedVec<u8, 900> = BoundedVec::from_array(storage);
+        let body_hash = get_body_hash(header, Sequence { index: 0, length: 900 }, 23);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    // c=simple keeps the "DKIM-Signature" spelling.
+    #[test]
+    fn test_body_hash_mixed_case_dkim_signature() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "from:a@b.cd\r\nDKIM-Signature: v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 13, length: 72 }, 37);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    #[test]
+    fn test_body_hash_after_semicolon_without_space() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1;bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;b=".as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 0, length: 69 }, 22);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    #[test]
+    fn test_body_hash_after_tab_fold() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "DKIM-Signature: v=1; a=rsa-sha256;\r\n\tbh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;\r\n\tb="
+                    .as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 0, length: 90 }, 40);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    #[test]
+    fn test_body_hash_after_space_fold() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "DKIM-Signature: v=1; a=rsa-sha256;\r\n bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;\r\n b="
+                    .as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 0, length: 90 }, 40);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    // "bh=" that does not start a tag (here the tail of "xbh=") is still rejected.
+    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
+    fn test_body_hash_not_starting_a_tag_rejected() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; xbh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;b=".as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 71 }, 24);
+    }
+}
+
+// Header-field boundaries (Consensys Diligence v1 audit findings 5.1, 5.3, 5.4) and binding the
+// body hash to the verified DKIM-Signature.
+mod test_header_field_boundaries {
+    use crate::{
+        headers::{
+            body_hash::get_body_hash, constrain_header_field,
+            constrain_header_field_detect_last_angle_bracket,
+        },
+        Sequence,
+    };
+
+    // A folded field (c=simple) must not be cut at the fold.
+    #[test(should_fail_with = "Header field must not end inside a fold")]
+    fn test_field_cut_at_fold_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:a@b.cd\r\n x\r\nto:c@d.ef".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        constrain_header_field::<64, 32, 4>(header, Sequence { index: 0, length: 11 }, from);
+    }
+
+    // Same on the address-extraction path.
+    #[test(should_fail_with = "Header field must not end inside a fold")]
+    fn test_address_field_cut_at_fold_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:a@b.cd\r\n\tx\r\nto:c@d.ef".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = constrain_header_field_detect_last_angle_bracket::<64, 32, 4>(
+            header,
+            Sequence { index: 0, length: 11 },
+            from,
+        );
+    }
+
+    // Guard: the whole folded field is accepted, and a field followed by a final CRLF (nothing
+    // after it) does not read past the header.
+    #[test]
+    fn test_whole_folded_field_and_trailing_crlf_accepted() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:a@b.cd\r\n x\r\nto:c@d.ef\r\n".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        constrain_header_field::<64, 32, 4>(header, Sequence { index: 0, length: 15 }, from);
+        let to: [u8; 2] = comptime { "to".as_bytes() };
+        constrain_header_field::<64, 32, 2>(header, Sequence { index: 17, length: 9 }, to);
+    }
+
+    #[test(should_fail_with = "Invalid header field name")]
+    fn test_name_with_colon_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "subject:foo:bar\r\nto:c@d.ef".as_bytes() });
+        let name: [u8; 11] = comptime { "subject:foo".as_bytes() };
+        constrain_header_field::<64, 32, 11>(header, Sequence { index: 0, length: 15 }, name);
+    }
+
+    // The "<name>:" must lie inside the sequence (here it would lie in the padding past len).
+    #[test(should_fail_with = "Header field too short to contain name and colon")]
+    fn test_field_shorter_than_name_rejected() {
+        let storage: [u8; 16] = comptime { "\r\nfrom:a@b.cd   ".as_bytes() };
+        let header: BoundedVec<u8, 16> = BoundedVec::from_parts_unchecked(storage, 4);
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        constrain_header_field::<16, 32, 4>(header, Sequence { index: 2, length: 2 }, from);
+    }
+
+    // bh= must come from the DKIM-Signature being verified, which is the last field.
+    #[test(should_fail_with = "DKIM-Signature field must be the last header field")]
+    fn test_body_hash_from_earlier_dkim_signature_rejected() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=\r\nfrom:a@b.cd"
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 71 }, 23);
+    }
+}
+
+// The address-specific field scan must inspect the first byte of the value. These inputs use
+// synthetic addresses and exercise the circuit interpreter, not a JS reconstruction.
+mod test_address_early_value_boundaries {
+    use crate::{
+        headers::{
+            constrain_header_field_detect_last_angle_bracket, email_address::get_email_address,
+        },
+        Sequence,
+    };
+
+    #[test(should_fail_with = "Email address must start immediately after '<' if bracket is present")]
+    fn test_early_angle_bracket_cannot_select_later_address() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:<real@a.bc> fake@b.cd".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 26 },
+            Sequence { index: 17, length: 9 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_early_bare_cr_in_address_field_rejected() {
+        let header: BoundedVec<u8, 32> =
+            BoundedVec::from_array(comptime { "from:a\rX@b.cd".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = constrain_header_field_detect_last_angle_bracket::<32, 32, 4>(
+            header,
+            Sequence { index: 0, length: 13 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Email address must contain '@'")]
+    fn test_address_without_at_rejected() {
+        let header: BoundedVec<u8, 32> =
+            BoundedVec::from_array(comptime { "from:fake".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 9 },
+            Sequence { index: 5, length: 4 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Email address must contain '@' exactly once")]
+    fn test_address_with_two_at_signs_rejected() {
+        let header: BoundedVec<u8, 32> =
+            BoundedVec::from_array(comptime { "from:a@@b.cd".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 12 },
+            Sequence { index: 5, length: 7 },
+            from,
+        );
+    }
+
+    #[test]
+    fn test_early_angle_bracket_and_folded_from_accepted() {
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let simple: BoundedVec<u8, 32> =
+            BoundedVec::from_array(comptime { "from:<real@a.bc>".as_bytes() });
+        let selected = get_email_address(
+            simple,
+            Sequence { index: 0, length: 16 },
+            Sequence { index: 6, length: 9 },
+            from,
+        );
+        assert(selected == BoundedVec::from_array(comptime { "real@a.bc".as_bytes() }));
+
+        let folded: BoundedVec<u8, 32> =
+            BoundedVec::from_array(comptime { "from: Name\r\n <real@a.bc>".as_bytes() });
+        let selected_folded = get_email_address(
+            folded,
+            Sequence { index: 0, length: 24 },
+            Sequence { index: 14, length: 9 },
+            from,
+        );
+        assert(selected_folded == BoundedVec::from_array(comptime { "real@a.bc".as_bytes() }));
+    }
+}
+
+mod test_body_hash_authenticated_length {
+    use crate::{headers::body_hash::get_body_hash, Sequence};
+
+    // The semicolon terminator is outside header.len() but inside storage. It cannot authorize bh=.
+    #[test(should_fail_with = "Body hash index accessed outside of DKIM header field")]
+    fn test_suffix_in_unauthed_storage_tail_rejected() {
+        let storage: [u8; 64] = comptime {
+            "dkim-signature:bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;X".as_bytes()
+        };
+        let header: BoundedVec<u8, 64> = BoundedVec::from_parts_unchecked(storage, 62);
+        let _ = get_body_hash(header, Sequence { index: 0, length: 62 }, 18);
+    }
+
+    #[test(should_fail)]
+    fn test_zero_body_hash_index_rejected() {
+        let header: BoundedVec<u8, 80> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=".as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 66 }, 0);
+    }
+
+    #[test(should_fail)]
+    fn test_overflow_body_hash_index_rejected() {
+        let header: BoundedVec<u8, 80> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=".as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 66 }, 4294967295);
+    }
+
+    #[test]
+    fn test_suffix_inside_field_accepted() {
+        let header: BoundedVec<u8, 80> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=".as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 66 }, 18);
+    }
+}
+
+mod test_cross_header_bh_matrix {
+    use crate::{headers::body_hash::get_body_hash, Sequence};
+
+    #[test(should_fail_with = "Body hash index accessed outside of DKIM header field")]
+    fn test_content_type_no_space_semicolon_rejected() {
+        let header: BoundedVec<u8, 180> = BoundedVec::from_array(
+            comptime {
+                "content-type:text/plain;bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 74, length: 71 }, 27);
+    }
+
+    #[test(should_fail_with = "Body hash index accessed outside of DKIM header field")]
+    fn test_list_unsubscribe_no_space_semicolon_rejected() {
+        let header: BoundedVec<u8, 180> = BoundedVec::from_array(
+            comptime {
+                "list-unsubscribe:<https://example.test/u>;bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 92, length: 71 }, 45);
+    }
+
+    #[test(should_fail_with = "Body hash index accessed outside of DKIM header field")]
+    fn test_subject_tab_fold_semicolon_rejected() {
+        let header: BoundedVec<u8, 180> = BoundedVec::from_array(
+            comptime {
+                "Subject: x;\r\n\tbh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 64, length: 71 }, 17);
+    }
+
+    #[test]
+    fn test_legitimate_folded_dkim_tag_accepted() {
+        let header: BoundedVec<u8, 80> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1;\r\n\tbh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 73 }, 25);
+    }
+}
+
+// Attempts to make get_body_hash read a sender-controlled "bh=" (Subject, other ';'-separated
+// fields, z= copies) instead of the signer's body hash.
+mod test_body_hash_injection {
+    use crate::{headers::body_hash::get_body_hash, Sequence};
+
+    // sha256("") = e3b0c442...b855, base64 "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
+    global EMPTY_BODY_HASH: [u8; 32] = [
+        0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9,
+        0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52,
+        0xb8, 0x55,
+    ];
+
+    // A ';bh=' in Subject is outside the DKIM-Signature field.
+    #[test(should_fail_with = "Body hash index accessed outside of DKIM header field")]
+    fn test_subject_semicolon_bh_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "subject:hi;bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 61, length: 71 }, 14);
+    }
+
+    // Claiming the Subject line is the DKIM-Signature field fails the name check.
+    #[test(should_fail_with = "Header field name does not match")]
+    fn test_subject_claimed_as_dkim_field_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "subject:hi;bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 59 }, 14);
+    }
+
+    // A 'dkim-signature:' written inside the Subject value does not start a line.
+    #[test(should_fail_with = "Header field must start with CRLF")]
+    fn test_dkim_name_inside_subject_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "subject:x;dkim-signature:bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 10, length: 63 }, 28);
+    }
+
+    // c=simple: a folded Subject continuation starts with WSP, so it can't be named dkim-signature.
+    #[test(should_fail_with = "Header field name does not match")]
+    fn test_dkim_name_in_folded_subject_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "Subject: x;\r\n dkim-signature:bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\r\nDKIM-Signature: v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 13, length: 64 }, 32);
+    }
+
+    // Content-Type also carries '; '-separated parameters; the DKIM field can't be stretched over it.
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_dkim_field_extended_into_content_type_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=\r\ncontent-type:text/plain; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;"
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 146 }, 101);
+    }
+
+    // Signature-like fields with other names (X-Google-DKIM-Signature, ARC-Message-Signature) are not DKIM-Signature.
+    #[test(should_fail_with = "Header field must start with CRLF")]
+    fn test_x_google_dkim_signature_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "x-google-dkim-signature:v=1; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; b=\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 9, length: 71 }, 32);
+    }
+
+    #[test(should_fail_with = "Header field name does not match")]
+    fn test_arc_message_signature_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "arc-message-signature:i=1; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; b=\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 78 }, 30);
+    }
+
+    // z= copies sender-controlled header fields into the DKIM-Signature, '=' escaped as =3D. A copied
+    // field whose name ends in 'e' (Date, Content-Type) produces 'e:bh=', which used to pass as the
+    // 'dkim-signature:bh=' first-tag prefix. (The literal trailing '=' here would be escaped by a real
+    // signer, so this pins the prefix rule rather than reproducing an end-to-end exploit.)
+    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
+    fn test_z_tag_copied_date_bh_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; z=Date:bh=3DsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 127 }, 30);
+    }
+
+    // The real bh= is still found when z= is present.
+    #[test]
+    fn test_body_hash_with_z_tag_accepted() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; z=Date:bh=3DsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 0, length: 127 }, 79);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    // c=simple keeps an all-caps name; bh= as the first tag is still found.
+    #[test]
+    fn test_body_hash_first_tag_uppercase_name_accepted() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "DKIM-SIGNATURE:bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=".as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 0, length: 66 }, 18);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    // The old check OR-ed "e:bh=" and ": bh=" byte by byte, so mixes like "::bh=" and "e bh="
+    // also passed, anywhere in the field. Each form is now matched whole, at its anchored position.
+    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
+    fn test_body_hash_first_tag_off_anchor_rejected() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature::bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b=".as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 67 }, 19);
+    }
+
+    // Two DKIM-Signature fields in the signed header still work: bh= comes from the last one.
+    #[test]
+    fn test_last_dkim_signature_accepted() {
+        let header: BoundedVec<u8, 160> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; b=\r\nsubject:hi\r\ndkim-signature:v=1; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let body_hash = get_body_hash(header, Sequence { index: 85, length: 71 }, 108);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+}
+
+mod test_masking {
+    use crate::masking::mask_text;
+
+    // Bytes past len are unconstrained padding and must never be output, even if the mask
+    // selects them.
+    #[test]
+    fn test_mask_text_zeroes_bytes_past_len() {
+        let text: BoundedVec<u8, 8> =
+            BoundedVec::from_parts_unchecked([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
+        let masked = mask_text(text, [true; 8]);
+        assert(masked == [0x61, 0x62, 0x63, 0x64, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn test_mask_text_applies_mask_within_len() {
+        let text: BoundedVec<u8, 8> =
+            BoundedVec::from_parts_unchecked([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
+        let masked = mask_text(text, [true, false, true, false, true, true, true, true]);
+        assert(masked == [0x61, 0, 0x63, 0, 0, 0, 0, 0]);
     }
 }

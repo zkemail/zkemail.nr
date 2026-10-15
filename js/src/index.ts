@@ -13,14 +13,14 @@ import {
 import * as NoirBignum from "@mach-34/noir-bignum-paramgen";
 import {
   u8ToU32,
-  getHeaderSequence,
+  getVerifiedDkimSignatureSequence,
   getAddressHeaderSequence,
   Sequence,
   BoundedVec,
 } from "./utils";
 
 export { verifyDKIMSignature } from "@zk-email/helpers/dist/dkim";
-export { hashRSAPublicKey } from "./utils";
+export { hashRSAPublicKey, getVerifiedDkimSignatureSequence } from "./utils";
 export type { RSAPublicKeyHashes } from "./utils";
 
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
@@ -130,6 +130,14 @@ export function generateEmailVerifierInputsFromDKIMResult(
     params.maxHeadersLength || MAX_HEADER_PADDED_BYTES
   );
 
+  // the field of the DKIM-Signature that was verified (the header may hold several)
+  const verifiedDkim = getVerifiedDkimSignatureSequence(headers, {
+    signingDomain: dkimResult.signingDomain,
+    selector: dkimResult.selector,
+    bodyHash: params.ignoreBodyHashCheck ? undefined : bodyHash,
+  });
+  const dkimHeaderSequence = verifiedDkim.sequence;
+
   // set inputs used in all cases
   const circuitInputs: CircuitInput = {
     header: {
@@ -142,7 +150,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
     },
     // modified from original: use noir bignum to format
     signature: NoirBignum.bnToLimbStrArray(signature, modulusLength),
-    dkim_header_sequence: getHeaderSequence(headers, "dkim-signature"),
+    dkim_header_sequence: dkimHeaderSequence,
   };
 
   // removed: header mask
@@ -154,7 +162,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
       );
     }
 
-    const bodyHashIndex = headers.toString().indexOf(bodyHash);
+    const { bodyHashIndex } = verifiedDkim;
     const maxBodyLength = params.maxBodyLength || MAX_BODY_PADDED_BYTES;
 
     // 65 comes from the 64 at the end and the 1 bit in the start, then 63 comes from the formula to round it up to the nearest 64.
