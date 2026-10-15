@@ -166,19 +166,28 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
         header_field_name,
     );
 
-    // check the header field is uninterrupted
+    // Scan the entire value. start_index already skips "<name>:", so starting the loop at the
+    // name length again would leave the first value bytes unchecked, including an early '<' or CR.
+    // Like constrain_header_field, a line break is allowed only as a complete CRLF + WSP fold.
     let mut last_angle_bracket = 0;
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
-    for i in (HEADER_FIELD_NAME_LENGTH + 1)..MAX_HEADER_FIELD_LENGTH {
-        // is it safe enough to cut this constraint cost in half by not checking lf? i think so
+    let mut expect_lf = false;
+    let mut expect_wsp = false;
+    for i in 0..MAX_HEADER_FIELD_LENGTH {
         let index = start_index + i;
         if (index < header_field_sequence.end_index()) {
             let byte = header.get_unchecked(index);
-            assert(byte != CR, "Header field must not contain newlines");
+            assert(
+                (!expect_lf | (byte == LF)) & (!expect_wsp | (byte == 0x20) | (byte == 0x09)),
+                "Header field must not contain newlines",
+            );
+            expect_wsp = expect_lf;
+            expect_lf = byte == CR;
             if byte == 0x3c {
                 last_angle_bracket = index;
             }
         }
     }
+    assert(!expect_lf & !expect_wsp, "Header field must not contain newlines");
     last_angle_bracket
 }
