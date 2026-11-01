@@ -156,6 +156,36 @@ mod test_tampered_hash {
     }
 }
 
+mod test_digest_verification {
+    use crate::tests::test_inputs::{EmailLarge, SyntheticKey1024};
+    use sha256::sha256_var;
+
+    #[test]
+    fn test_verify_digest_2048() {
+        let digest = sha256_var(EmailLarge::HEADER.storage(), EmailLarge::HEADER.len());
+        let verified =
+            EmailLarge::PUBKEY.verify_digest_sha256_pkcs1v15(digest, EmailLarge::SIGNATURE);
+        assert_eq(verified, digest);
+    }
+
+    #[test]
+    fn test_verify_digest_1024() {
+        let message = SyntheticKey1024::MESSAGE;
+        let digest = sha256_var(message.storage(), message.len());
+        let _ = SyntheticKey1024::PUBKEY.verify_digest_sha256_pkcs1v15(
+            digest,
+            SyntheticKey1024::SIGNATURE,
+        );
+    }
+
+    #[test(should_fail)]
+    fn test_verify_digest_wrong_digest() {
+        let mut digest = sha256_var(EmailLarge::HEADER.storage(), EmailLarge::HEADER.len());
+        digest[0] ^= 1;
+        let _ = EmailLarge::PUBKEY.verify_digest_sha256_pkcs1v15(digest, EmailLarge::SIGNATURE);
+    }
+}
+
 mod test_redc_binding_2048 {
     use crate::tests::test_inputs::EmailLarge;
 

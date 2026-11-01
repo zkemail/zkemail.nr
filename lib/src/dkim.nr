@@ -19,6 +19,22 @@ impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
         let pubkey = Self { modulus, redc };
         pubkey
     }
+
+    // the signature as a BigNum under this key, required to be less than the modulus
+    fn signature_bignum<let MOD_BITS: u32>(
+        self,
+        signature: [Field; KEY_LIMBS],
+    ) -> RuntimeBigNum<KEY_LIMBS, MOD_BITS> {
+        let params: BigNumParams<KEY_LIMBS, MOD_BITS> = BigNumParams::new(
+            false,
+            convert_field_to_u128(self.modulus),
+            convert_field_to_u128(self.redc),
+        );
+
+        let signature = RuntimeBigNum::from_array(params, convert_field_to_u128(signature));
+        signature.validate_in_field();
+        signature
+    }
 }
 
 impl RSAPubkey<KEY_LIMBS_1024> {
@@ -30,20 +46,20 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         // hash the header
         let header_hash = sha256_var(header.storage(), header.len());
 
-        let params: BigNumParams<KEY_LIMBS_1024, 1024> = BigNumParams::new(
-            false,
-            convert_field_to_u128(self.modulus),
-            convert_field_to_u128(self.redc),
-        );
-
-        let signature: RBN1024 =
-            RuntimeBigNum::from_array(params, convert_field_to_u128(signature));
-        signature.validate_in_field();
-
         // verify the DKIM signature over the header
-        assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
+        self.verify_digest_sha256_pkcs1v15(header_hash, signature)
+    }
 
-        header_hash
+    /// Verify a PKCS#1 v1.5 SHA-256 signature over a precomputed digest. The caller must
+    /// constrain the digest to the signed message.
+    pub fn verify_digest_sha256_pkcs1v15(
+        self,
+        digest: [u8; 32],
+        signature: [Field; KEY_LIMBS_1024],
+    ) -> [u8; 32] {
+        let signature: RBN1024 = self.signature_bignum(signature);
+        assert(verify_sha256_pkcs1v15(digest, signature, RSA_EXPONENT));
+        digest
     }
 
     /// Returns [modulus hash, redc hash]. Only the modulus hash identifies the key: BigNum uses
@@ -73,20 +89,20 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         // hash the header
         let header_hash = sha256_var(header.storage(), header.len());
 
-        let params: BigNumParams<KEY_LIMBS_2048, 2048> = BigNumParams::new(
-            false,
-            convert_field_to_u128(self.modulus),
-            convert_field_to_u128(self.redc),
-        );
-
-        let signature: RBN2048 =
-            RuntimeBigNum::from_array(params, convert_field_to_u128(signature));
-        signature.validate_in_field();
-
         // verify the DKIM signature over the header
-        assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
+        self.verify_digest_sha256_pkcs1v15(header_hash, signature)
+    }
 
-        header_hash
+    /// Verify a PKCS#1 v1.5 SHA-256 signature over a precomputed digest. The caller must
+    /// constrain the digest to the signed message.
+    pub fn verify_digest_sha256_pkcs1v15(
+        self,
+        digest: [u8; 32],
+        signature: [Field; KEY_LIMBS_2048],
+    ) -> [u8; 32] {
+        let signature: RBN2048 = self.signature_bignum(signature);
+        assert(verify_sha256_pkcs1v15(digest, signature, RSA_EXPONENT));
+        digest
     }
 
     /// Returns [modulus hash, redc hash]. Only the modulus hash identifies the key: BigNum uses
