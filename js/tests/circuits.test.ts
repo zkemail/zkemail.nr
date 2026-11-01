@@ -96,12 +96,14 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       });
       // simulate witness
       const result = await proverMasked.simulateWitness(inputs);
-      // compute mask locally
+      // compute mask locally; bytes past len are never revealed
+      const headerLen = Number(inputs.header.len);
+      const bodyLen = Number(inputs.body!.len);
       const expectedMaskedHeader = inputs.header.storage.map((byte, i) =>
-        headerMask[i] === 1 ? parseInt(byte) : 0
+        i < headerLen && headerMask[i] === 1 ? parseInt(byte) : 0
       );
       const expectedMaskedBody = inputs.body!.storage.map((byte, i) =>
-        bodyMask[i] === 1 ? parseInt(byte) : 0
+        i < bodyLen && bodyMask[i] === 1 ? parseInt(byte) : 0
       );
       // compare results
       const acutalMaskedHeader = result.returnValue[1].map((byte) =>

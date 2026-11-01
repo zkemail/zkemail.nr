@@ -12,9 +12,14 @@ pub fn mask_text<let TEXT_LEN: u32>(
     mask: [bool; TEXT_LEN],
 ) -> [u8; TEXT_LEN] {
     let mut masked_text = [0; TEXT_LEN];
-    // probably fine to just iterate through whole thing without an if statement
+    // bytes past text.len() are not covered by the signature, so never reveal them. Track this
+    // with a flag cleared at text.len(), which is cheaper than comparing i < text.len()
+    let mut active = true;
     for i in 0..TEXT_LEN {
-        masked_text[i] = (text.get_unchecked(i) * mask[i] as u8);
+        if i == text.len() {
+            active = false;
+        }
+        masked_text[i] = text.get_unchecked(i) * (mask[i] & active) as u8;
     }
     masked_text
 }

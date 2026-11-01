@@ -795,3 +795,33 @@ mod test_address_extraction {
         );
     }
 }
+
+mod test_masking {
+    use crate::masking::mask_text;
+
+    #[test]
+    fn test_mask_ignores_inactive_bytes() {
+        // storage past len() is prover-chosen and unsigned
+        let text: BoundedVec<u8, 4> = BoundedVec::from_parts([65, 66, 90, 91], 2);
+        assert_eq(mask_text(text, [false, true, true, true]), [0, 66, 0, 0]);
+    }
+
+    // from zkemail/zkemail.nr#67 (Divide-By-0): bytes past len are unconstrained padding and
+    // must never be output, even if the mask selects them
+    #[test]
+    fn test_mask_text_zeroes_bytes_past_len() {
+        let text: BoundedVec<u8, 8> =
+            BoundedVec::from_parts([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
+        let masked = mask_text(text, [true; 8]);
+        assert(masked == [0x61, 0x62, 0x63, 0x64, 0, 0, 0, 0]);
+    }
+
+    // from zkemail/zkemail.nr#67 (Divide-By-0)
+    #[test]
+    fn test_mask_text_applies_mask_within_len() {
+        let text: BoundedVec<u8, 8> =
+            BoundedVec::from_parts([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
+        let masked = mask_text(text, [true, false, true, false, true, true, true, true]);
+        assert(masked == [0x61, 0, 0x63, 0, 0, 0, 0, 0]);
+    }
+}
