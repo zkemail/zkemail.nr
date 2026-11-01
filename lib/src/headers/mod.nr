@@ -18,6 +18,21 @@ fn check_header_field_bounds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LE
     header_field_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) {
+    // the expected name must itself be a valid field name: printable ASCII except ':' (RFC 5322
+    // section 2.2). A name containing ':' or CRLF could swallow part of a field value or a line
+    // break. Free for constant names.
+    assert(HEADER_FIELD_NAME_LENGTH != 0, "Header field name must not be empty");
+    for i in 0..HEADER_FIELD_NAME_LENGTH {
+        let c = header_field_name[i];
+        assert((c >= 0x21) & (c <= 0x7e) & (c != 0x3a), "Invalid header field name");
+    }
+
+    // the sequence must at least hold "<name>:"
+    assert(
+        header_field_sequence.length > HEADER_FIELD_NAME_LENGTH,
+        "Header field too short to contain name and colon",
+    );
+
     // the field must fit in the range scanned by the callers
     assert(header_field_sequence.length <= MAX_HEADER_FIELD_LENGTH, "Header field too long");
 
@@ -37,23 +52,46 @@ fn check_header_field_bounds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LE
         );
     }
 
-    // if the sequence is not the end, check for a newline
+    // if the sequence is not the end, check for a newline that really ends the field
     if end_index != header.len() {
         assert(header.get_unchecked(end_index) == CR, "Header field must end with CRLF");
         assert(header.get_unchecked(end_index + 1) == LF, "Header field must end with CRLF");
+        // a CRLF followed by SP or HTAB is a fold: the field continues on the next line (c=simple
+        // keeps folds). Ending the sequence there would claim only the first line(s) of a folded
+        // field as the whole field. When end_index + 2 == len there is no next line.
+        if end_index + 2 < header.len() {
+            let next = header.get_unchecked(end_index + 2);
+            assert((next != 0x20) & (next != 0x09), "Header field must not end inside a fold");
+        }
     }
 
-    // check that the header field name matches the expected name
+    // check that the header field name matches the expected name, ignoring ASCII case: field
+    // names are case-insensitive (RFC 5322 section 1.2.2) and c=simple keeps their original case.
+    // Only A-Z are folded, so no other byte can alias a name byte. Comparing each header byte with
+    // both cases of the expected byte costs about 8 gates less per byte than lowercasing it.
     for i in 0..HEADER_FIELD_NAME_LENGTH {
-        assert(
-            header.get_unchecked(header_field_sequence.index + i) == header_field_name[i],
-            "Header field name does not match",
-        );
+        let lower = to_ascii_lowercase(header_field_name[i]);
+        let upper = if (lower >= 0x61) & (lower <= 0x7a) {
+            lower - 0x20
+        } else {
+            lower
+        };
+        let byte = header.get_unchecked(header_field_sequence.index + i);
+        assert((byte == lower) | (byte == upper), "Header field name does not match");
     }
     assert(
         header.get_unchecked(header_field_sequence.index + HEADER_FIELD_NAME_LENGTH) == 0x3a,
         "Header field name must be followed by a colon",
     );
+}
+
+// Lowercase an ASCII letter; every other byte is returned unchanged.
+fn to_ascii_lowercase(byte: u8) -> u8 {
+    if (byte >= 0x41) & (byte <= 0x5a) {
+        byte + 0x20
+    } else {
+        byte
+    }
 }
 
 /**
