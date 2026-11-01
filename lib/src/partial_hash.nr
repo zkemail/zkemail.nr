@@ -177,11 +177,10 @@ pub fn partial_sha256_var_interstitial<let N: u32>(
 pub fn partial_sha256_var_end<let N: u32>(
     mut h: [u32; 8],
     msg: [u8; N],
-    message_size: u64,
-    real_message_size: u64,
+    message_size: u32,
+    real_message_size: u32,
 ) -> [u8; 32] {
-    let message_size = message_size as u32; // noir stdlib uses u64
-    let real_message_size = real_message_size as u32; // noir stdlib uses u64
+    assert(message_size <= N, "Message size exceeds input length");
     let num_blocks = N / BLOCK_SIZE;
     let mut msg_block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
     let mut msg_byte_ptr = 0; // Pointer into msg_block
@@ -278,6 +277,8 @@ pub fn partial_sha256_var_end<let N: u32>(
         msg_byte_ptr = 0;
     }
 
+    // the length in bits can exceed u32, so compute it as u64
+    let real_message_size = real_message_size as u64;
     msg_block = unsafe { attach_len_to_msg_block(msg_block, msg_byte_ptr, real_message_size) };
 
     if !is_unconstrained() {
@@ -319,7 +320,7 @@ unconstrained fn pad_msg_block(
 unconstrained fn attach_len_to_msg_block(
     mut msg_block: [u8; BLOCK_SIZE],
     mut msg_byte_ptr: u32,
-    message_size: u32,
+    message_size: u64,
 ) -> [u8; BLOCK_SIZE] {
     // We assume that `msg_byte_ptr` is less than 57 because if not then it is reset to zero before calling this function.
     // In any case, fill blocks up with zeros until the last 64 (i.e. until msg_byte_ptr = 56).
@@ -362,7 +363,7 @@ fn test_partial_hash() {
         data1[i] = DATA[data0.len() + i];
     }
     let state = partial_sha256_var_start(data0);
-    let hash = partial_sha256_var_end(state, data1, data1.len() as u64, DATA.len() as u64);
+    let hash = partial_sha256_var_end(state, data1, data1.len(), DATA.len());
     let correct_hash = sha256::sha256_var(DATA, DATA.len());
     assert_eq(hash, correct_hash);
 }
@@ -379,12 +380,7 @@ fn test_partial_hash_interstitial() {
     }
     let pre_hash = partial_sha256_var_start(data0);
     let interstitial_hash = partial_sha256_var_interstitial(pre_hash, data1, data1.len());
-    let hash = partial_sha256_var_end(
-        interstitial_hash,
-        data2,
-        data2.len() as u64,
-        DATA.len() as u64,
-    );
+    let hash = partial_sha256_var_end(interstitial_hash, data2, data2.len(), DATA.len());
     let correct_hash = sha256::sha256_var(DATA, DATA.len());
     assert_eq(hash, correct_hash);
 }
@@ -401,12 +397,30 @@ fn test_partial_hash_interstitial_var() {
     }
     let pre_hash = partial_sha256_var_start(data0);
     let interstitial_hash = partial_sha256_var_interstitial(pre_hash, data1, 64);
-    let hash = partial_sha256_var_end(
-        interstitial_hash,
-        data2,
-        data2.len() as u64,
-        DATA.len() as u64,
-    );
+    let hash = partial_sha256_var_end(interstitial_hash, data2, data2.len(), DATA.len());
     let correct_hash = sha256::sha256_var(DATA, DATA.len());
     assert_eq(hash, correct_hash);
+}
+
+#[test]
+fn test_partial_hash_end_bit_length_above_u32() {
+    // with the SHA-256 IV as state this is the final block for a (2^32 - 64)-byte message,
+    // whose length in bits does not fit in a u32
+    let state: [u32; 8] = [
+        1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635,
+        1541459225,
+    ];
+    let hash = partial_sha256_var_end(state, [], 0, 4294967232);
+    let expected: [u8; 32] = [
+        162, 245, 133, 137, 66, 227, 230, 185, 154, 226, 188, 91, 68, 52, 226, 189, 180, 177, 250,
+        19, 137, 224, 237, 232, 45, 131, 51, 169, 77, 133, 43, 139,
+    ];
+    assert_eq(hash, expected);
+}
+
+#[test(should_fail_with = "Message size exceeds input length")]
+fn test_partial_hash_end_message_size_above_input() {
+    // claims 100 bytes of a 64-byte input
+    let state: [u32; 8] = [0; 8];
+    let _ = partial_sha256_var_end(state, [0; 64], 100, 100);
 }

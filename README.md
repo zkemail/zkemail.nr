@@ -68,7 +68,7 @@ use zkemail::{
   // extract the body hash from the header
   let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
   // finish the partial hash
-  let computed_body_hash = partial_sha256_var_end(partial_body_hash, body.storage(), body.len() as u64, partial_body_real_length);   
+  let computed_body_hash = partial_sha256_var_end(partial_body_hash, body.storage(), body.len(), partial_body_real_length);   
   // constain the computed body hash to match the one found in the header
   assert(
     signed_body_hash == computed_body_hash,

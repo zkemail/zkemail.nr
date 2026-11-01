@@ -46,8 +46,8 @@ mod test_success {
         let computed_body_hash = partial_sha256_var_end(
             EmailLarge::PARTIAL_BODY_HASH,
             EmailLarge::PARTIAL_BODY.storage(),
-            EmailLarge::PARTIAL_BODY.len() as u64,
-            EmailLarge::PARTIAL_BODY_REAL_LENGTH as u64,
+            EmailLarge::PARTIAL_BODY.len(),
+            EmailLarge::PARTIAL_BODY_REAL_LENGTH,
         );
         // compare the body hashes
         assert(

@@ -33,7 +33,7 @@ fn main(
     body_hash_index: u32,
     dkim_header_sequence: Sequence,
     partial_body_hash: [u32; 8],
-    partial_body_real_length: u64,
+    partial_body_real_length: u32,
 ) -> pub [Field; 3] {
     // check the body and header lengths are within bounds
     assert(header.len() <= MAX_EMAIL_HEADER_LENGTH, "Email header length exceeds maximum length");
@@ -52,7 +52,7 @@ fn main(
     let computed_body_hash = partial_sha256_var_end(
         partial_body_hash,
         body.storage(),
-        body.len() as u64,
+        body.len(),
         partial_body_real_length,
     );
 
