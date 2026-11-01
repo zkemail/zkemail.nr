@@ -86,7 +86,10 @@ mod test_success {
 }
 
 mod test_tampered_hash {
-    use crate::{headers::body_hash::get_body_hash, tests::test_inputs::EmailLarge};
+    use crate::{
+        headers::body_hash::get_body_hash,
+        tests::test_inputs::{EmailLarge, SyntheticKey1024},
+    };
     use sha256::sha256_var;
 
     // no reasonable message to constrain here
@@ -125,6 +128,30 @@ mod test_tampered_hash {
         sig[0] += delta * 0x1000000000000000000000000000000;
         sig[1] -= delta;
         pubkey.verify_dkim_signature(EmailLarge::HEADER, sig);
+    }
+
+    #[test(should_fail_with = "Limb does not fit in u128")]
+    fn test_dkim_signature_limb_above_u128() {
+        // `as u128` would drop the 2^128 term, leaving the original signature
+        let mut sig = EmailLarge::SIGNATURE;
+        sig[0] += 0x100000000000000000000000000000000;
+        EmailLarge::PUBKEY.verify_dkim_signature(EmailLarge::HEADER, sig);
+    }
+
+    #[test]
+    fn test_dkim_signature_synthetic_1024() {
+        SyntheticKey1024::PUBKEY.verify_dkim_signature(
+            SyntheticKey1024::MESSAGE,
+            SyntheticKey1024::SIGNATURE,
+        );
+    }
+
+    #[test(should_fail_with = "all to assert_max_bit_size")]
+    fn test_dkim_signature_not_reduced() {
+        SyntheticKey1024::PUBKEY.verify_dkim_signature(
+            SyntheticKey1024::MESSAGE,
+            SyntheticKey1024::SIGNATURE_PLUS_MODULUS,
+        );
     }
 }
 

@@ -278,6 +278,62 @@ pub(crate) mod EmailSmall {
     );
 }
 
+pub(crate) mod SyntheticKey1024 {
+    use crate::{dkim::RSAPubkey, KEY_LIMBS_1024};
+
+    // Synthetic 1024-bit key whose modulus is just above 2^1023, so that
+    // SIGNATURE + modulus still fits in 1024 bits.
+    pub(crate) global MESSAGE: BoundedVec<u8, 4> = BoundedVec::from_array([116, 101, 115, 116]); // "test"
+    pub(crate) global PUBKEY: RSAPubkey<KEY_LIMBS_1024> = RSAPubkey::new(
+        [
+            0xbb6307c434288353a09ea3ea9cbfa3,
+            0x0b5f9d76d49c51f81b033a67bb30c0,
+            0x81eb552985cef8150f14b80b481945,
+            0x62314c8451da2e8e1fd2bd7a0e29fd,
+            0x44d827bff9c5c661fbb0652034bfc7,
+            0x00e9b1c86d86e8caf3fa324a8c77a4,
+            0x0,
+            0x0,
+            0x8000000000000000,
+        ],
+        [
+            0xbffeb70c33a75f87b3b526322a2c15,
+            0xa1096619431e18218fe7cadc5f4fe1,
+            0x56ac28fe61388babe67359220ce35d,
+            0xceb37bae25d171e02eed3026724a65,
+            0x27d840063a399e044f9adfcb40389d,
+            0x164e37927917350c05cdb573885bbb,
+            0xffffffffffffffffffffffffffffff,
+            0xffffffffffffffffffffffffffffff,
+            0x7fffffffffffffffff,
+        ],
+    );
+    pub(crate) global SIGNATURE: [Field; KEY_LIMBS_1024] = [
+        0x44dbc4748f1ca3a57eeda2af6b58c6,
+        0x50b6bb8afd5b1ffb90458520b83c11,
+        0x9dd277983e26b4a6c1881a6f89657d,
+        0x52c5a9a0b723c31b74d48b2c733ae1,
+        0x8c4ad5c53d05e8caea86aa4524f25b,
+        0x348864c9844a3fe2e2b631feff2a2f,
+        0x8d902862aed5d978d1b6a88e62a3c3,
+        0xd7684b2ed91af5a77e7f7cb53465fd,
+        0x2fc1778ecf09272e,
+    ];
+    // SIGNATURE + modulus: the same residue, so it passes the RSA check unless
+    // the signature is required to be reduced.
+    pub(crate) global SIGNATURE_PLUS_MODULUS: [Field; KEY_LIMBS_1024] = [
+        0x003ecc38c34526f91f8c469a081869,
+        0x5c165901d1f771f3ab48bf88736cd2,
+        0x1fbdccc1c3f5acbbd09cd27ad17ec2,
+        0xb4f6f62508fdf1a994a748a68164df,
+        0xd122fd8536cbaf2ce6370f6559b222,
+        0x35721691f1d128add6b064498ba1d3,
+        0x8d902862aed5d978d1b6a88e62a3c3,
+        0xd7684b2ed91af5a77e7f7cb53465fd,
+        0xafc1778ecf09272e,
+    ];
+}
+
 pub(crate) mod PartialHash {
     pub(crate) global DATA: [u8; 192] = [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
