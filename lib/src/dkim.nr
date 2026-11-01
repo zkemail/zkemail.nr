@@ -46,6 +46,8 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         header_hash
     }
 
+    /// Returns [modulus hash, redc hash]. Only the modulus hash identifies the key: BigNum uses
+    /// redc only to compute witnesses and never checks it against the modulus.
     pub fn hash(self) -> [Field; 2] {
         // validate
         self.validate_in_range();
@@ -87,6 +89,8 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         header_hash
     }
 
+    /// Returns [modulus hash, redc hash]. Only the modulus hash identifies the key: BigNum uses
+    /// redc only to compute witnesses and never checks it against the modulus.
     pub fn hash(self) -> [Field; 2] {
         // validate range
         self.validate_in_range();
