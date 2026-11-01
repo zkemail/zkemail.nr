@@ -1,4 +1,5 @@
 pub(crate) mod test_inputs;
+mod header_parsing;
 
 mod test_success {
 
@@ -298,6 +299,30 @@ mod header_field_access {
         let (header, body_hash_index) = EmailLarge::tampered_dkim_field();
         let sequence: Sequence = Sequence { index: 0, length: header.len() };
         let _ = get_body_hash(header, sequence, body_hash_index);
+    }
+
+    #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
+    fn test_body_hash_in_tag_value() {
+        // "e:bh=" inside the z= copy of a Date header
+        let header: BoundedVec<u8, 127> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; z=Date:bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 127 }, 30);
+    }
+
+    #[test(should_fail_with = "DKIM-Signature field must be the last header field")]
+    fn test_body_hash_in_earlier_dkim_field() {
+        // a signed, earlier dkim-signature field with a different bh
+        let header: BoundedVec<u8, 136> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=;\r\ndkim-signature:v=1; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 63 }, 18);
     }
 
     #[test(should_fail_with = "Header field too long")]
