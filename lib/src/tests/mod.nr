@@ -86,7 +86,10 @@ mod test_success {
 }
 
 mod test_tampered_hash {
-    use crate::{headers::body_hash::get_body_hash, tests::test_inputs::EmailLarge};
+    use crate::{
+        headers::body_hash::get_body_hash,
+        tests::test_inputs::{EmailLarge, SyntheticKey1024, SyntheticKey2048},
+    };
     use sha256::sha256_var;
 
     // no reasonable message to constrain here
@@ -125,6 +128,54 @@ mod test_tampered_hash {
         sig[0] += delta * 0x1000000000000000000000000000000;
         sig[1] -= delta;
         pubkey.verify_dkim_signature(EmailLarge::HEADER, sig);
+    }
+
+    // The library's range checks carry no message of their own, so the three tests below can only
+    // match "call to assert_max_bit_size", which the 120-bit limb check and `validate_in_field`
+    // share. Each test's inputs are chosen so that only one of the two checks can fail.
+
+    #[test(should_fail_with = "call to assert_max_bit_size")]
+    fn test_dkim_signature_limb_above_u128() {
+        // Fails in the 120-bit limb check of `convert_field_to_u128`. Without that check, `as u128`
+        // drops the 2^128 term, which leaves the original signature: reduced, and valid.
+        let mut sig = EmailLarge::SIGNATURE;
+        sig[0] += 0x100000000000000000000000000000000;
+        EmailLarge::PUBKEY.verify_dkim_signature(EmailLarge::HEADER, sig);
+    }
+
+    #[test]
+    fn test_dkim_signature_synthetic_1024() {
+        SyntheticKey1024::PUBKEY.verify_dkim_signature(
+            SyntheticKey1024::MESSAGE,
+            SyntheticKey1024::SIGNATURE,
+        );
+    }
+
+    #[test(should_fail_with = "call to assert_max_bit_size")]
+    fn test_dkim_signature_not_reduced() {
+        // Fails in `validate_in_field`: n - (s + n) underflows, so a limb of the difference fails
+        // its range check. Every limb of s + n is below 2^120, so the limb check passes.
+        SyntheticKey1024::PUBKEY.verify_dkim_signature(
+            SyntheticKey1024::MESSAGE,
+            SyntheticKey1024::SIGNATURE_PLUS_MODULUS,
+        );
+    }
+
+    #[test]
+    fn test_dkim_signature_synthetic_2048() {
+        SyntheticKey2048::PUBKEY.verify_dkim_signature(
+            SyntheticKey2048::MESSAGE,
+            SyntheticKey2048::SIGNATURE,
+        );
+    }
+
+    #[test(should_fail_with = "call to assert_max_bit_size")]
+    fn test_dkim_signature_not_reduced_2048() {
+        // As above, for the 2048-bit `verify_dkim_signature`: fails in `validate_in_field`.
+        SyntheticKey2048::PUBKEY.verify_dkim_signature(
+            SyntheticKey2048::MESSAGE,
+            SyntheticKey2048::SIGNATURE_PLUS_MODULUS,
+        );
     }
 }
 

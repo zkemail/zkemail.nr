@@ -278,6 +278,158 @@ pub(crate) mod EmailSmall {
     );
 }
 
+pub(crate) mod SyntheticKey1024 {
+    use crate::{dkim::RSAPubkey, KEY_LIMBS_1024};
+
+    // Synthetic 1024-bit key whose modulus is just above 2^1023, so that
+    // SIGNATURE + modulus still fits in 1024 bits.
+    pub(crate) global MESSAGE: BoundedVec<u8, 4> = BoundedVec::from_array([116, 101, 115, 116]); // "test"
+    pub(crate) global PUBKEY: RSAPubkey<KEY_LIMBS_1024> = RSAPubkey::new(
+        [
+            0xbb6307c434288353a09ea3ea9cbfa3,
+            0x0b5f9d76d49c51f81b033a67bb30c0,
+            0x81eb552985cef8150f14b80b481945,
+            0x62314c8451da2e8e1fd2bd7a0e29fd,
+            0x44d827bff9c5c661fbb0652034bfc7,
+            0x00e9b1c86d86e8caf3fa324a8c77a4,
+            0x0,
+            0x0,
+            0x8000000000000000,
+        ],
+        [
+            0xbffeb70c33a75f87b3b526322a2c15,
+            0xa1096619431e18218fe7cadc5f4fe1,
+            0x56ac28fe61388babe67359220ce35d,
+            0xceb37bae25d171e02eed3026724a65,
+            0x27d840063a399e044f9adfcb40389d,
+            0x164e37927917350c05cdb573885bbb,
+            0xffffffffffffffffffffffffffffff,
+            0xffffffffffffffffffffffffffffff,
+            0x7fffffffffffffffff,
+        ],
+    );
+    pub(crate) global SIGNATURE: [Field; KEY_LIMBS_1024] = [
+        0x44dbc4748f1ca3a57eeda2af6b58c6,
+        0x50b6bb8afd5b1ffb90458520b83c11,
+        0x9dd277983e26b4a6c1881a6f89657d,
+        0x52c5a9a0b723c31b74d48b2c733ae1,
+        0x8c4ad5c53d05e8caea86aa4524f25b,
+        0x348864c9844a3fe2e2b631feff2a2f,
+        0x8d902862aed5d978d1b6a88e62a3c3,
+        0xd7684b2ed91af5a77e7f7cb53465fd,
+        0x2fc1778ecf09272e,
+    ];
+    // SIGNATURE + modulus: the same residue, so it passes the RSA check unless
+    // the signature is required to be reduced.
+    pub(crate) global SIGNATURE_PLUS_MODULUS: [Field; KEY_LIMBS_1024] = [
+        0x003ecc38c34526f91f8c469a081869,
+        0x5c165901d1f771f3ab48bf88736cd2,
+        0x1fbdccc1c3f5acbbd09cd27ad17ec2,
+        0xb4f6f62508fdf1a994a748a68164df,
+        0xd122fd8536cbaf2ce6370f6559b222,
+        0x35721691f1d128add6b064498ba1d3,
+        0x8d902862aed5d978d1b6a88e62a3c3,
+        0xd7684b2ed91af5a77e7f7cb53465fd,
+        0xafc1778ecf09272e,
+    ];
+}
+
+pub(crate) mod SyntheticKey2048 {
+    use crate::{dkim::RSAPubkey, KEY_LIMBS_2048};
+
+    // Synthetic 2048-bit key whose modulus is just above 2^2047, so that
+    // SIGNATURE + modulus still fits in 2048 bits. Generated with plain Python
+    // integers: p is a random 1024-bit prime, q is the first prime above
+    // 2^2047 / p, n = p * q, e = 65537, redc = floor(2^(2 * 2048 + 6) / n), and
+    // SIGNATURE = EMSA-PKCS1-v1_5(SHA-256(MESSAGE))^d mod n. Limbs are 120 bits,
+    // least significant first.
+    pub(crate) global MESSAGE: BoundedVec<u8, 4> = BoundedVec::from_array([116, 101, 115, 116]); // "test"
+    pub(crate) global PUBKEY: RSAPubkey<KEY_LIMBS_2048> = RSAPubkey::new(
+        [
+            0x97d4f03f9ed67132a165e71cd49805,
+            0x491e12ad634a920885fe786ca40fe5,
+            0x4c45da6a63918453acf28ad6f73e22,
+            0x881f4362eef5f0d3600a6ced1e0916,
+            0x7f6262dd59a242ca88bb93d4a29aa0,
+            0xa48d6ad051566ac4fe80ccf67d5491,
+            0x552716555c27a0325b9eafe25d669e,
+            0x44d0b4f0fcf8afec9c67307487230a,
+            0x000000000001625c3080312f48ea0b,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x80,
+        ],
+        [
+            0x2b0fc061298ecd5e9a18e32f3d012e,
+            0xe1ed529cb56df77a0187935bf01a68,
+            0xba25959c6e7bac530d752908c1ddb6,
+            0xe0bc9d110a0f2c9ff59312e1f6e9b3,
+            0x9d9d22a65dbd3577446c2b5d655f77,
+            0x72952faea9953b017f330982ab6e80,
+            0xd8e9aaa3d85fcda461501da299615b,
+            0x2f4b0f030750136398cf8b78dcf5aa,
+            0xfffffffffe9da3cf7fced0b715f4bb,
+            0xffffffffffffffffffffffffffffff,
+            0xffffffffffffffffffffffffffffff,
+            0xffffffffffffffffffffffffffffff,
+            0xffffffffffffffffffffffffffffff,
+            0xffffffffffffffffffffffffffffff,
+            0xffffffffffffffffffffffffffffff,
+            0xffffffffffffffffffffffffffffff,
+            0xffffffffffffffffffffffffffffff,
+            0x7fff,
+        ],
+    );
+    pub(crate) global SIGNATURE: [Field; KEY_LIMBS_2048] = [
+        0x7e57b97fb1d56c61b970a36e3c6358,
+        0xa48f2148d0e2563aa84c70a6f71155,
+        0x1226797c0fe2373615e7d6c17eaa8d,
+        0x06374d182647dc7b2802577d22a83a,
+        0x78f2f41456d438aedae4f703782465,
+        0x9a6a40178a204fd5a271f14d8a5d44,
+        0xac5b82fdc4a5308af49c74c15549ff,
+        0x17431af621e393709fc825844b1e46,
+        0xeb53257489ffe96b682efe70653dda,
+        0x7eb43d43537921f7c00e71ae2ec9cf,
+        0x0b747659d91875f21c29e5ef2188da,
+        0xa76081dea689807d0cbea27adb9843,
+        0x7f3669db28bd4a2961cac196be572e,
+        0x1ea384e93fe7480326894c7a6d5758,
+        0x6be46c7bc69752acfdddcbeea59169,
+        0x9d2930bd02a878966e0b78328f79db,
+        0x021354badb21d1e8a27e1ff03e769d,
+        0x75,
+    ];
+    // SIGNATURE + modulus: the same residue, so it passes the RSA check unless
+    // the signature is required to be reduced.
+    pub(crate) global SIGNATURE_PLUS_MODULUS: [Field; KEY_LIMBS_2048] = [
+        0x162ca9bf50abdd945ad68a8b10fb5d,
+        0xedad33f6342ce8432e4ae9139b213b,
+        0x5e6c53e67373bb89c2da619875e8af,
+        0x8e56907b153dcd4e880cc46a40b150,
+        0xf85556f1b0767b7963a08ad81abf05,
+        0x3ef7aae7db76ba9aa0f2be4407b1d5,
+        0x0182995320ccd0bd503b24a3b2b09e,
+        0x5c13cfe71edc435d3c2f55f8d24151,
+        0xeb5325748a014bc798af2f9fae27e5,
+        0x7eb43d43537921f7c00e71ae2ec9cf,
+        0x0b747659d91875f21c29e5ef2188da,
+        0xa76081dea689807d0cbea27adb9843,
+        0x7f3669db28bd4a2961cac196be572e,
+        0x1ea384e93fe7480326894c7a6d5758,
+        0x6be46c7bc69752acfdddcbeea59169,
+        0x9d2930bd02a878966e0b78328f79db,
+        0x021354badb21d1e8a27e1ff03e769d,
+        0xf5,
+    ];
+}
+
 pub(crate) mod PartialHash {
     pub(crate) global DATA: [u8; 192] = [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
