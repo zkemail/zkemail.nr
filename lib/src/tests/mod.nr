@@ -212,6 +212,21 @@ mod test_redc_binding_1024 {
     }
 }
 
+mod test_fold_limbs {
+    use crate::hash::fold_limbs121;
+
+    #[test]
+    fn test_fold_even_limb_count() {
+        let base = 2.pow_32(121);
+        assert_eq(fold_limbs121::<4, 2>([1, 2, 3, 4]), [1 + base * 2, 3 + base * 4]);
+    }
+
+    #[test(should_fail_with = "K_out must be ceil(K / 2)")]
+    fn test_fold_rejects_dropped_limbs() {
+        let _ = fold_limbs121::<5, 2>([1, 2, 3, 4, 5]);
+    }
+}
+
 mod header_field_access {
 
     use crate::{headers::body_hash::get_body_hash, Sequence, tests::test_inputs::EmailLarge};
