@@ -6,8 +6,11 @@
 mod test_header_field_canonicalization {
     use crate::{
         headers::{
-            body_hash::{get_body_hash, get_body_hash_with_max_field_length},
+            body_hash::{
+                get_body_hash, get_body_hash_with_folds, get_body_hash_with_max_field_length,
+            },
             constrain_header_field,
+            constrain_header_field_with_folds,
         },
         Sequence,
     };
@@ -34,6 +37,45 @@ mod test_header_field_canonicalization {
             BoundedVec::from_array(comptime { "Frum:a@b.cd\r\nto:x@y.zz".as_bytes() });
         let from: [u8; 4] = comptime { "from".as_bytes() };
         constrain_header_field::<64, 16, 4>(header, Sequence { index: 0, length: 11 }, from);
+    }
+
+    #[test]
+    fn test_folded_field_accepted() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "x-test:a;\r\n\tb;\r\n c\r\nto:x@y.zz".as_bytes() },
+        );
+        let name: [u8; 6] = comptime { "x-test".as_bytes() };
+        constrain_header_field_with_folds::<64, 32, 6>(
+            header,
+            Sequence { index: 0, length: 18 },
+            name,
+        );
+    }
+
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_line_break_without_fold_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "x-test:a\r\nto:x@y.zz".as_bytes() });
+        let name: [u8; 6] = comptime { "x-test".as_bytes() };
+        constrain_header_field_with_folds::<64, 32, 6>(
+            header,
+            Sequence { index: 0, length: 19 },
+            name,
+        );
+    }
+
+    // A fold's CRLF + WSP must be inside the field; the bytes after header.len() are unconstrained
+    // padding and must not complete one.
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_fold_completed_by_padding_rejected() {
+        let storage: [u8; 16] = comptime { "x-test:a\r\n zzzzz".as_bytes() };
+        let header: BoundedVec<u8, 16> = BoundedVec::from_parts(storage, 9);
+        let name: [u8; 6] = comptime { "x-test".as_bytes() };
+        constrain_header_field_with_folds::<16, 32, 6>(
+            header,
+            Sequence { index: 0, length: 9 },
+            name,
+        );
     }
 
     // the cap includes "<name>:", so 9 bytes here (#67: 4 value bytes)
@@ -113,6 +155,32 @@ mod test_header_field_canonicalization {
         assert(body_hash == EMPTY_BODY_HASH);
     }
 
+    #[test]
+    fn test_body_hash_after_tab_fold() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "DKIM-Signature: v=1; a=rsa-sha256;\r\n\tbh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;\r\n\tb="
+                    .as_bytes()
+            },
+        );
+        let body_hash =
+            get_body_hash_with_folds::<128, 300>(header, Sequence { index: 0, length: 90 }, 40);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
+    #[test]
+    fn test_body_hash_after_space_fold() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "DKIM-Signature: v=1; a=rsa-sha256;\r\n bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;\r\n b="
+                    .as_bytes()
+            },
+        );
+        let body_hash =
+            get_body_hash_with_folds::<128, 300>(header, Sequence { index: 0, length: 90 }, 40);
+        assert(body_hash == EMPTY_BODY_HASH);
+    }
+
     // "bh=" that does not start a tag (here the tail of "xbh=") is still rejected.
     #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
     fn test_body_hash_not_starting_a_tag_rejected() {
@@ -129,7 +197,7 @@ mod test_header_field_boundaries {
     use crate::{
         headers::{
             body_hash::get_body_hash, constrain_header_field,
-            constrain_header_field_detect_last_angle_bracket,
+            constrain_header_field_detect_last_angle_bracket, constrain_header_field_with_folds,
         },
         Sequence,
     };
@@ -153,6 +221,26 @@ mod test_header_field_boundaries {
             header,
             Sequence { index: 0, length: 11 },
             from,
+        );
+    }
+
+    // Guard: the whole folded field is accepted, and a field followed by a final CRLF (nothing
+    // after it) does not read past the header.
+    #[test]
+    fn test_whole_folded_field_and_trailing_crlf_accepted() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:a@b.cd\r\n x\r\nto:c@d.ef\r\n".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        constrain_header_field_with_folds::<64, 32, 4>(
+            header,
+            Sequence { index: 0, length: 15 },
+            from,
+        );
+        let to: [u8; 2] = comptime { "to".as_bytes() };
+        constrain_header_field_with_folds::<64, 32, 2>(
+            header,
+            Sequence { index: 17, length: 9 },
+            to,
         );
     }
 
@@ -189,7 +277,8 @@ mod test_header_field_boundaries {
 mod test_address_early_value_boundaries {
     use crate::{
         headers::{
-            constrain_header_field_detect_last_angle_bracket, email_address::get_email_address,
+            constrain_header_field_detect_last_angle_bracket,
+            email_address::{get_email_address, get_email_address_with_folds},
         },
         Sequence,
     };
@@ -244,6 +333,30 @@ mod test_address_early_value_boundaries {
             from,
         );
     }
+
+    #[test]
+    fn test_early_angle_bracket_and_folded_from_accepted() {
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let simple: BoundedVec<u8, 32> =
+            BoundedVec::from_array(comptime { "from:<real@a.bc>".as_bytes() });
+        let selected = get_email_address(
+            simple,
+            Sequence { index: 0, length: 16 },
+            Sequence { index: 6, length: 9 },
+            from,
+        );
+        assert(selected == BoundedVec::from_array(comptime { "real@a.bc".as_bytes() }));
+
+        let folded: BoundedVec<u8, 32> =
+            BoundedVec::from_array(comptime { "from: Name\r\n <real@a.bc>".as_bytes() });
+        let selected_folded = get_email_address_with_folds::<32, 4, 325>(
+            folded,
+            Sequence { index: 0, length: 24 },
+            Sequence { index: 14, length: 9 },
+            from,
+        );
+        assert(selected_folded == BoundedVec::from_array(comptime { "real@a.bc".as_bytes() }));
+    }
 }
 
 mod test_body_hash_authenticated_length {
@@ -291,7 +404,7 @@ mod test_body_hash_authenticated_length {
 }
 
 mod test_cross_header_bh_matrix {
-    use crate::{headers::body_hash::get_body_hash, Sequence};
+    use crate::{headers::body_hash::{get_body_hash, get_body_hash_with_folds}, Sequence};
 
     #[test(should_fail_with = "Body hash index accessed outside of DKIM header field")]
     fn test_content_type_no_space_semicolon_rejected() {
@@ -324,6 +437,17 @@ mod test_cross_header_bh_matrix {
             },
         );
         let _ = get_body_hash(header, Sequence { index: 64, length: 71 }, 17);
+    }
+
+    #[test]
+    fn test_legitimate_folded_dkim_tag_accepted() {
+        let header: BoundedVec<u8, 80> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1;\r\n\tbh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash_with_folds::<80, 300>(header, Sequence { index: 0, length: 73 }, 25);
     }
 }
 

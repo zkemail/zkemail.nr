@@ -870,6 +870,64 @@ mod test_address_extraction {
     }
 }
 
+mod test_folded_fields {
+    use crate::{
+        headers::{
+            body_hash::{get_body_hash, get_body_hash_with_folds},
+            constrain_header_field,
+            email_address::get_email_address_with_folds,
+        },
+        Sequence,
+    };
+
+    // the default scan assumes relaxed canonicalization: a fold is a line break
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_folded_field_rejected_by_default() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "x-test:a;\r\n\tb;\r\n c\r\nto:x@y.zz".as_bytes() },
+        );
+        let name: [u8; 6] = comptime { "x-test".as_bytes() };
+        constrain_header_field::<64, 32, 6>(header, Sequence { index: 0, length: 18 }, name);
+    }
+
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_folded_body_hash_rejected_by_default() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "DKIM-Signature: v=1; a=rsa-sha256;\r\n\tbh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;\r\n\tb="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 90 }, 40);
+    }
+
+    // the fold-aware scan still rejects a CRLF that starts a new line
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_body_hash_with_folds_rejects_new_line() {
+        let header: BoundedVec<u8, 128> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1;\r\nbh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash_with_folds::<128, 300>(header, Sequence { index: 0, length: 72 }, 24);
+    }
+
+    // folds do not relax the address-field rules: comments are still rejected
+    #[test(should_fail_with = "Comments and quoted-pairs are not supported in address fields")]
+    fn test_folded_address_with_comment_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from: Name\r\n <real@a.bc> (x)".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address_with_folds::<64, 4, 325>(
+            header,
+            Sequence { index: 0, length: 28 },
+            Sequence { index: 14, length: 9 },
+            from,
+        );
+    }
+}
+
 mod test_masking {
     use crate::masking::mask_text;
 

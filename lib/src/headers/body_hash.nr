@@ -1,12 +1,15 @@
 use crate::{
-    BODY_HASH_BASE64_LENGTH, headers::constrain_header_field, MAX_DKIM_HEADER_FIELD_LENGTH,
+    BODY_HASH_BASE64_LENGTH,
+    headers::{constrain_header_field, constrain_header_field_with_folds},
+    MAX_DKIM_HEADER_FIELD_LENGTH,
     Sequence,
 };
 use base64::BASE64_DECODER;
 
 // ON DKIM-SIGNATURE PARSING:
 // In the current version, DKIM-SIGNATURE tags are mostly ignored:
-// c= is ignored, meaning we assume the canonicalization is relaxed. This can cause denial of service issues
+// c= is ignored. get_body_hash and get_body_hash_with_max_field_length assume relaxed header
+//   canonicalization (no folded lines); use get_body_hash_with_folds for c=simple headers
 // v= is ignored, meaning we do not check for a valid version of dkim signing
 // l= is ignored, meaning we otherwise constrain the body length to be safe
 // x= is ignored, meaning we accept signatures without expiration
@@ -52,13 +55,60 @@ pub fn get_body_hash_with_max_field_length<let MAX_HEADER_LENGTH: u32, let MAX_D
     dkim_header_field_sequence: Sequence,
     body_hash_index: u32,
 ) -> [u8; 32] {
-    // constrain the access of dkim signature field
-    let header_field_name: [u8; 14] = comptime { "dkim-signature".as_bytes() };
-    constrain_header_field::<MAX_HEADER_LENGTH, MAX_DKIM_FIELD_LENGTH, 14>(
+    get_body_hash_inner::<MAX_HEADER_LENGTH, MAX_DKIM_FIELD_LENGTH>(
         header,
         dkim_header_field_sequence,
-        header_field_name,
-    );
+        body_hash_index,
+        false,
+    )
+}
+
+/**
+ * get_body_hash_with_max_field_length for headers whose DKIM-Signature field may be folded, as
+ * c=simple header canonicalization keeps it. The field scan accepts CRLF followed by SP or HTAB
+ * (see constrain_header_field_with_folds), which costs about 12 more gates per byte of
+ * MAX_DKIM_FIELD_LENGTH. c=simple fields are often longer than the 300-byte default cap.
+ *
+ * @param MAX_HEADER_LENGTH - The maximum length of the email header
+ * @param MAX_DKIM_FIELD_LENGTH - The maximum length of the DKIM-Signature field, name included
+ * @param header - The email header as validated in the DKIM signature
+ * @param dkim_header_field_sequence - The sequence of the DKIM header field
+ * @param body_hash_index - The index of the body hash in the header
+ */
+pub fn get_body_hash_with_folds<let MAX_HEADER_LENGTH: u32, let MAX_DKIM_FIELD_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    dkim_header_field_sequence: Sequence,
+    body_hash_index: u32,
+) -> [u8; 32] {
+    get_body_hash_inner::<MAX_HEADER_LENGTH, MAX_DKIM_FIELD_LENGTH>(
+        header,
+        dkim_header_field_sequence,
+        body_hash_index,
+        true,
+    )
+}
+
+fn get_body_hash_inner<let MAX_HEADER_LENGTH: u32, let MAX_DKIM_FIELD_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    dkim_header_field_sequence: Sequence,
+    body_hash_index: u32,
+    allow_folds: bool,
+) -> [u8; 32] {
+    // constrain the access of dkim signature field
+    let header_field_name: [u8; 14] = comptime { "dkim-signature".as_bytes() };
+    if allow_folds {
+        constrain_header_field_with_folds::<MAX_HEADER_LENGTH, MAX_DKIM_FIELD_LENGTH, 14>(
+            header,
+            dkim_header_field_sequence,
+            header_field_name,
+        );
+    } else {
+        constrain_header_field::<MAX_HEADER_LENGTH, MAX_DKIM_FIELD_LENGTH, 14>(
+            header,
+            dkim_header_field_sequence,
+            header_field_name,
+        );
+    }
     // the DKIM-Signature being verified is the last field of its signing input: RFC 6376
     // section 3.7 appends it, with b= emptied, after the h= fields and without a trailing CRLF.
     // Other DKIM-Signature fields can only appear earlier, when listed in h=, and their bh= was

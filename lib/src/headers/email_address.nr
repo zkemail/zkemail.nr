@@ -1,6 +1,11 @@
 use crate::{
-    EMAIL_ADDRESS_CHAR_TABLE, headers::constrain_header_field_detect_last_angle_bracket,
-    MAX_EMAIL_ADDRESS_LENGTH, Sequence,
+    EMAIL_ADDRESS_CHAR_TABLE,
+    headers::{
+        constrain_header_field_detect_last_angle_bracket,
+        constrain_header_field_detect_last_angle_bracket_with_folds,
+    },
+    MAX_EMAIL_ADDRESS_LENGTH,
+    Sequence,
 };
 
 /**
@@ -35,12 +40,59 @@ pub fn get_email_address_with_max_field_length<let MAX_HEADER_LENGTH: u32, let H
     email_address_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) -> BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> {
-    // check field is uninterrupted and matches the expected field name
-    let last_angle_bracket = constrain_header_field_detect_last_angle_bracket::<MAX_HEADER_LENGTH, MAX_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+    get_email_address_inner::<MAX_HEADER_LENGTH, HEADER_FIELD_NAME_LENGTH, MAX_FIELD_LENGTH>(
         header,
         header_field_sequence,
+        email_address_sequence,
         header_field_name,
-    );
+        false,
+    )
+}
+
+/**
+ * get_email_address_with_max_field_length for address fields that may be folded, as c=simple
+ * header canonicalization keeps them. The field scan accepts CRLF followed by SP or HTAB (see
+ * constrain_header_field_detect_last_angle_bracket_with_folds), which costs more per byte of
+ * MAX_FIELD_LENGTH.
+ *
+ * @param MAX_FIELD_LENGTH - The maximum length of the header field, name included
+ */
+pub fn get_email_address_with_folds<let MAX_HEADER_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32, let MAX_FIELD_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    header_field_sequence: Sequence,
+    email_address_sequence: Sequence,
+    header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
+) -> BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> {
+    get_email_address_inner::<MAX_HEADER_LENGTH, HEADER_FIELD_NAME_LENGTH, MAX_FIELD_LENGTH>(
+        header,
+        header_field_sequence,
+        email_address_sequence,
+        header_field_name,
+        true,
+    )
+}
+
+fn get_email_address_inner<let MAX_HEADER_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32, let MAX_FIELD_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    header_field_sequence: Sequence,
+    email_address_sequence: Sequence,
+    header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
+    allow_folds: bool,
+) -> BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> {
+    // check field is uninterrupted and matches the expected field name
+    let last_angle_bracket = if allow_folds {
+        constrain_header_field_detect_last_angle_bracket_with_folds::<MAX_HEADER_LENGTH, MAX_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+            header,
+            header_field_sequence,
+            header_field_name,
+        )
+    } else {
+        constrain_header_field_detect_last_angle_bracket::<MAX_HEADER_LENGTH, MAX_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+            header,
+            header_field_sequence,
+            header_field_name,
+        )
+    };
     // if angle bracket found, assert index is +1
     if last_angle_bracket != 0 {
         assert(

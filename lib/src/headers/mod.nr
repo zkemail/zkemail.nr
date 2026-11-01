@@ -96,6 +96,8 @@ fn to_ascii_lowercase(byte: u8) -> u8 {
 
 /**
  * Constrain a sequence in a header to match the specific header field
+ * The field must be on one line, as relaxed canonicalization (which the library assumes) leaves
+ * it. Use constrain_header_field_with_folds for c=simple headers, which keep folded lines.
  *
  * @param MAX_HEADER_LENGTH - The maximum length of the email header
  * @param MAX_HEADER_FIELD_LENGTH - The maximum length of the header field
@@ -109,6 +111,38 @@ pub fn constrain_header_field<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_L
     header_field_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) {
+    constrain_header_field_inner::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+        header,
+        header_field_sequence,
+        header_field_name,
+        false,
+    );
+}
+
+/**
+ * constrain_header_field that also accepts folded lines (CRLF followed by SP or HTAB), as kept by
+ * c=simple header canonicalization. A CRLF not followed by SP or HTAB still ends the field.
+ * This costs about 12 more gates per byte of MAX_HEADER_FIELD_LENGTH than constrain_header_field.
+ */
+pub fn constrain_header_field_with_folds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    header_field_sequence: Sequence,
+    header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
+) {
+    constrain_header_field_inner::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+        header,
+        header_field_sequence,
+        header_field_name,
+        true,
+    );
+}
+
+fn constrain_header_field_inner<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    header_field_sequence: Sequence,
+    header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
+    allow_folds: bool,
+) {
     // constrain beginning of header field
     check_header_field_bounds::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
         header,
@@ -118,12 +152,20 @@ pub fn constrain_header_field<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_L
 
     // check the header field is uninterrupted
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
+    let mut folds = FoldCheck::new();
     for i in 0..MAX_HEADER_FIELD_LENGTH {
-        // is it safe enough to cut this constraint cost in half by not checking lf? i think so
         let index = start_index + i;
         if (index < header_field_sequence.end_index()) {
-            assert(header.get_unchecked(index) != CR, "Header field must not contain newlines");
+            let byte = header.get_unchecked(index);
+            if allow_folds {
+                folds.check(byte);
+            } else {
+                assert(byte != CR, "Header field must not contain newlines");
+            }
         }
+    }
+    if allow_folds {
+        folds.finish();
     }
 }
 
@@ -137,6 +179,37 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
     header_field_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) -> u32 {
+    detect_last_angle_bracket_inner::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+        header,
+        header_field_sequence,
+        header_field_name,
+        false,
+    )
+}
+
+/**
+ * constrain_header_field_detect_last_angle_bracket that also accepts folded lines (CRLF followed
+ * by SP or HTAB), as kept by c=simple header canonicalization.
+ */
+pub fn constrain_header_field_detect_last_angle_bracket_with_folds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    header_field_sequence: Sequence,
+    header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
+) -> u32 {
+    detect_last_angle_bracket_inner::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+        header,
+        header_field_sequence,
+        header_field_name,
+        true,
+    )
+}
+
+fn detect_last_angle_bracket_inner<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    header_field_sequence: Sequence,
+    header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
+    allow_folds: bool,
+) -> u32 {
     // constrain beginning of header field
     check_header_field_bounds::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
         header,
@@ -147,13 +220,17 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
     // check the header field is uninterrupted
     let mut last_angle_bracket = 0;
     let mut quoted = false;
+    let mut folds = FoldCheck::new();
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
     for i in 0..(MAX_HEADER_FIELD_LENGTH - HEADER_FIELD_NAME_LENGTH - 1) {
-        // is it safe enough to cut this constraint cost in half by not checking lf? i think so
         let index = start_index + i;
         if (index < header_field_sequence.end_index()) {
             let byte = header.get_unchecked(index);
-            assert(byte != CR, "Header field must not contain newlines");
+            if allow_folds {
+                folds.check(byte);
+            } else {
+                assert(byte != CR, "Header field must not contain newlines");
+            }
             assert(
                 (byte as Field - 0x28) * (byte as Field - 0x5c) != 0,
                 "Comments and quoted-pairs are not supported in address fields",
@@ -164,6 +241,47 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
             }
         }
     }
+    if allow_folds {
+        folds.finish();
+    }
     assert(!quoted, "Unterminated quoted string");
     last_angle_bracket
+}
+
+// Line-break check for folded fields: a CR is allowed only as the start of a complete fold,
+// CRLF followed by SP or HTAB (RFC 5322 section 2.2.3). A CRLF followed by anything else starts
+// a new header line. Two carried flags replace reading the next two bytes for every byte, and
+// the checks are Field products rather than boolean selects, which keeps the cost per byte low.
+struct FoldCheck {
+    expect_lf: Field, // the previous field byte was CR
+    expect_wsp: Field, // the previous two field bytes were CRLF
+}
+
+impl FoldCheck {
+    fn new() -> Self {
+        FoldCheck { expect_lf: 0, expect_wsp: 0 }
+    }
+
+    fn check(&mut self, byte: u8) {
+        let byte = byte as Field;
+        assert(
+            self.expect_lf * (byte - LF as Field) == 0,
+            "Header field must not contain newlines",
+        );
+        assert(
+            self.expect_wsp * (byte - 0x20) * (byte - 0x09) == 0,
+            "Header field must not contain newlines",
+        );
+        self.expect_wsp = self.expect_lf;
+        self.expect_lf = (byte == CR as Field) as Field;
+    }
+
+    // a fold must be complete inside the field: otherwise a field ending in CR or CRLF could be
+    // completed by bytes outside it, including the unconstrained storage past header.len()
+    fn finish(self) {
+        assert(
+            (self.expect_lf == 0) & (self.expect_wsp == 0),
+            "Header field must not contain newlines",
+        );
+    }
 }
