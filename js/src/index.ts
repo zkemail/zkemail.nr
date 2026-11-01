@@ -23,6 +23,13 @@ export { verifyDKIMSignature } from "@zk-email/helpers/dist/dkim";
 export { hashRSAPublicKey } from "./utils";
 export type { RSAPublicKeyHashes } from "./utils";
 
+// BigNum v0.11 expects redc = floor(2^(2 * bits + 6) / modulus); noir-bignum-paramgen
+// still uses 2^(2 * bits + 4)
+function bnToRedcLimbStrArray(modulus: bigint, bits: number): string[] {
+  const redc = (1n << (2n * BigInt(bits) + 6n)) / modulus;
+  return NoirBignum.bnToLimbStrArray(redc);
+}
+
 // This file is essentially https://github.com/zkemail/zk-email-verify/blob/main/packages/helpers/src/input-generators.ts
 // modified for noir input generation
 
@@ -138,7 +145,7 @@ export function generateEmailVerifierInputsFromDKIMResult(
     },
     pubkey: {
       modulus: NoirBignum.bnToLimbStrArray(publicKey, modulusLength),
-      redc: NoirBignum.bnToRedcLimbStrArray(publicKey, modulusLength),
+      redc: bnToRedcLimbStrArray(publicKey, modulusLength),
     },
     // modified from original: use noir bignum to format
     signature: NoirBignum.bnToLimbStrArray(signature, modulusLength),

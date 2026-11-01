@@ -9,8 +9,8 @@ use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
 use sha256::sha256_var;
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
-    modulus: [Field; KEY_LIMBS],
-    redc: [Field; KEY_LIMBS],
+    pub(crate) modulus: [Field; KEY_LIMBS],
+    pub(crate) redc: [Field; KEY_LIMBS],
 }
 
 impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
@@ -28,7 +28,7 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         signature: [Field; KEY_LIMBS_1024],
     ) -> [u8; 32] {
         // hash the header
-        let header_hash = sha256_var(header.storage(), header.len() as u64);
+        let header_hash = sha256_var(header.storage(), header.len());
 
         let params: BigNumParams<KEY_LIMBS_1024, 1024> = BigNumParams::new(
             false,
@@ -69,7 +69,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         signature: [Field; KEY_LIMBS_2048],
     ) -> [u8; 32] {
         // hash the header
-        let header_hash = sha256_var(header.storage(), header.len() as u64);
+        let header_hash = sha256_var(header.storage(), header.len());
 
         let params: BigNumParams<KEY_LIMBS_2048, 2048> = BigNumParams::new(
             false,

@@ -167,11 +167,11 @@ describe("ZKEmail.nr Circuit Unit Tests", () => {
       let computedHashes = await hashRSAPublicKey(modulus, redc);
       const result = await prover2048.simulateWitness(inputs);
       // returnValue[0] = modulus hash, returnValue[1] = redc hash, returnValue[2] = email nullifier
-      expect(result.returnValue[0].slice(2)).toEqual(
-        computedHashes.modulusHash.toString(16)
+      expect(BigInt(result.returnValue[0] as string)).toEqual(
+        computedHashes.modulusHash
       );
-      expect(result.returnValue[1].slice(2)).toEqual(
-        computedHashes.redcHash.toString(16)
+      expect(BigInt(result.returnValue[1] as string)).toEqual(
+        computedHashes.redcHash
       );
     });
   });
