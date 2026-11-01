@@ -540,6 +540,76 @@ mod test_address_extraction {
         assert_eq(address, EmailAddressUnderscore::ADDRESS);
     }
 
+    #[test(should_fail_with = "Comments and quoted-pairs are not supported in address fields")]
+    fn test_address_in_trailing_comment() {
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let header: BoundedVec<u8, 40> = BoundedVec::from_array(
+            comptime { "\r\nfrom:<bob@evil.com> (<ceo@bank.com>)\r\n".as_bytes() },
+        );
+        let _ = get_email_address(
+            header,
+            Sequence { index: 2, length: 36 },
+            Sequence { index: 24, length: 12 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Email address and its closing '>' must end the field")]
+    fn test_address_in_quoted_display_name() {
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let header: BoundedVec<u8, 38> = BoundedVec::from_array(
+            comptime { "\r\nfrom:\"<ceo@bank.com>\" bob@evil.com\r\n".as_bytes() },
+        );
+        let _ = get_email_address(
+            header,
+            Sequence { index: 2, length: 34 },
+            Sequence { index: 9, length: 12 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Email address must end the field if no bracket is present")]
+    fn test_bare_address_in_quoted_string() {
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let header: BoundedVec<u8, 39> = BoundedVec::from_array(
+            comptime { "\r\nfrom:bob@evil.com \"x ceo@bank.com>\"\r\n".as_bytes() },
+        );
+        let _ = get_email_address(
+            header,
+            Sequence { index: 2, length: 35 },
+            Sequence { index: 23, length: 12 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Comments and quoted-pairs are not supported in address fields")]
+    fn test_address_in_unterminated_comment() {
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let header: BoundedVec<u8, 39> = BoundedVec::from_array(
+            comptime { "\r\nfrom:<bob@evil.com> (<ceo@bank.com>\r\n".as_bytes() },
+        );
+        let _ = get_email_address(
+            header,
+            Sequence { index: 2, length: 35 },
+            Sequence { index: 24, length: 12 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Unterminated quoted string")]
+    fn test_address_in_unterminated_quote() {
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let header: BoundedVec<u8, 37> = BoundedVec::from_array(
+            comptime { "\r\nfrom:bob@evil.com \"<ceo@bank.com>\r\n".as_bytes() },
+        );
+        let _ = get_email_address(
+            header,
+            Sequence { index: 2, length: 33 },
+            Sequence { index: 22, length: 12 },
+            from,
+        );
+    }
+
     #[test(should_fail_with = "Header field must not contain newlines")]
     fn test_short_field_spanning_next_line() {
         // the CRLF after "a@b" sits in the first bytes of the value

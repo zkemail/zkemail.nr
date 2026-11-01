@@ -90,7 +90,9 @@ pub fn constrain_header_field<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_L
 }
 
 /**
- * constrain_header_field with checks for the last occurence of "<" inside the loop to save constraints
+ * constrain_header_field with checks for the last occurence of "<" inside the loop to save constraints.
+ * Comments and quoted-pairs are rejected and quoted strings must be closed, so a field cannot end
+ * inside a comment or quoted string.
  */
 pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
     header: BoundedVec<u8, MAX_HEADER_LENGTH>,
@@ -106,6 +108,7 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
 
     // check the header field is uninterrupted
     let mut last_angle_bracket = 0;
+    let mut quoted = false;
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
     for i in 0..(MAX_HEADER_FIELD_LENGTH - HEADER_FIELD_NAME_LENGTH - 1) {
         // is it safe enough to cut this constraint cost in half by not checking lf? i think so
@@ -113,10 +116,16 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
         if (index < header_field_sequence.end_index()) {
             let byte = header.get_unchecked(index);
             assert(byte != CR, "Header field must not contain newlines");
+            assert(
+                (byte as Field - 0x28) * (byte as Field - 0x5c) != 0,
+                "Comments and quoted-pairs are not supported in address fields",
+            );
+            quoted = quoted != (byte == 0x22);
             if byte == 0x3c {
                 last_angle_bracket = index;
             }
         }
     }
+    assert(!quoted, "Unterminated quoted string");
     last_angle_bracket
 }

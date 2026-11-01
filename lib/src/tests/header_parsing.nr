@@ -86,6 +86,49 @@ mod test_header_field_boundaries {
     }
 }
 
+mod test_address_early_value_boundaries {
+    use crate::{headers::email_address::get_email_address, Sequence};
+
+    #[test(should_fail_with = "Email address must start immediately after '<' if bracket is present")]
+    fn test_early_angle_bracket_cannot_select_later_address() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:<real@a.bc> fake@b.cd".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 26 },
+            Sequence { index: 17, length: 9 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Email address must contain '@'")]
+    fn test_address_without_at_rejected() {
+        let header: BoundedVec<u8, 32> =
+            BoundedVec::from_array(comptime { "from:fake".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 9 },
+            Sequence { index: 5, length: 4 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Email address must contain '@' exactly once")]
+    fn test_address_with_two_at_signs_rejected() {
+        let header: BoundedVec<u8, 32> =
+            BoundedVec::from_array(comptime { "from:a@@b.cd".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 12 },
+            Sequence { index: 5, length: 7 },
+            from,
+        );
+    }
+}
+
 mod test_body_hash_authenticated_length {
     use crate::{headers::body_hash::get_body_hash, Sequence};
 

@@ -201,18 +201,18 @@ pub(crate) mod EmailAddresses {
         comptime { "\r\nfrom:runnier.leagues.0j@icloud.com\r\n".as_bytes() };
     pub(crate) global NO_BRACKETS: [u8; 51] =
         comptime { "\r\nfrom:ZKEmail Team runnier.leagues.0j@icloud.com\r\n".as_bytes() };
-    pub(crate) global BRACKETS: [u8; 52] =
-        comptime { "\r\nfrom:ZKEmail Team <runnier.leagues.0j@icloud.com\r\n".as_bytes() };
-    pub(crate) global QUOTES: [u8; 66] = comptime {
-        "\r\nfrom:\"president@whitehouse.gov\" <runnier.leagues.0j@icloud.com\r\n".as_bytes()
+    pub(crate) global BRACKETS: [u8; 53] =
+        comptime { "\r\nfrom:ZKEmail Team <runnier.leagues.0j@icloud.com>\r\n".as_bytes() };
+    pub(crate) global QUOTES: [u8; 67] = comptime {
+        "\r\nfrom:\"president@whitehouse.gov\" <runnier.leagues.0j@icloud.com>\r\n".as_bytes()
     };
     pub(crate) global ADDRESS_ONLY_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 34 };
     pub(crate) global ADDRESS_ONLY_ADDRESS_SEQUENCE: Sequence = Sequence { index: 7, length: 29 };
     pub(crate) global NO_BRACKETS_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 47 };
     pub(crate) global NO_BRACKETS_ADDRESS_SEQUENCE: Sequence = Sequence { index: 20, length: 29 };
-    pub(crate) global BRACKETS_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 48 };
+    pub(crate) global BRACKETS_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 49 };
     pub(crate) global BRACKETS_ADDRESS_SEQUENCE: Sequence = Sequence { index: 21, length: 29 };
-    pub(crate) global QUOTES_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 62 };
+    pub(crate) global QUOTES_FIELD_SEQUENCE: Sequence = Sequence { index: 2, length: 63 };
     pub(crate) global QUOTES_ADDRESS_SEQUENCE: Sequence = Sequence { index: 35, length: 29 };
     pub(crate) global MALICIOUS_QUOTES_ADDRESS_SEQUENCE: Sequence =
         Sequence { index: 8, length: 24 };

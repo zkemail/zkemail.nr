@@ -56,7 +56,51 @@ pub fn get_email_address_with_max_field_length<let MAX_HEADER_LENGTH: u32, let H
     );
 
     // constrained get email address
-    parse_email_address(header, email_address_sequence)
+    let email_address = parse_email_address(header, email_address_sequence);
+    // the address must end the field (followed only by '>' if bracketed), so text after it,
+    // such as a comment holding "<other@address>", cannot be selected instead
+    let email_end = email_address_sequence.end_index();
+    if last_angle_bracket != 0 {
+        assert(
+            (email_end + 1 == header_field_sequence.end_index())
+                & (header.get_unchecked(email_end) == 0x3e),
+            "Email address and its closing '>' must end the field",
+        );
+    } else {
+        assert(
+            email_end == header_field_sequence.end_index(),
+            "Email address must end the field if no bracket is present",
+        );
+    }
+    email_address
+}
+
+// EMAIL_ADDRESS_CHAR_TABLE with '@' (0x40) marked 4 instead of 1
+global ADDRESS_CHAR_CLASS: [u8; 123] = comptime {
+    let mut table = EMAIL_ADDRESS_CHAR_TABLE;
+    table[0x40] = 4;
+    table
+};
+
+// The offset of the only '@' in the address, or its length if it has none or several (so that
+// parse_email_address fails with the '@' message rather than the character message).
+unconstrained fn find_at_sign<let MAX_HEADER_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    email_address_sequence: Sequence,
+) -> u32 {
+    let mut offset = email_address_sequence.length;
+    let mut count = 0;
+    for i in 0..email_address_sequence.length {
+        if header.get_unchecked(email_address_sequence.index + i) == 0x40 {
+            offset = i;
+            count += 1;
+        }
+    }
+    if count == 1 {
+        offset
+    } else {
+        email_address_sequence.length
+    }
 }
 
 pub fn parse_email_address<let MAX_HEADER_LENGTH: u32>(
@@ -83,17 +127,30 @@ pub fn parse_email_address<let MAX_HEADER_LENGTH: u32>(
     // check the email address and assign
     let mut email_address: BoundedVec<u8, MAX_EMAIL_ADDRESS_LENGTH> =
         BoundedVec::from_parts([0; MAX_EMAIL_ADDRESS_LENGTH], email_address_sequence.length);
+    // exactly one '@': the prover names its offset, the byte there must be '@', and every other
+    // byte must be an acceptable character other than '@'. This costs one constraint per byte on
+    // top of the character check, where counting the '@'s costs several.
+    // Safety: the byte at at_offset is constrained to be the address's '@' below
+    let at_offset = unsafe { find_at_sign(header, email_address_sequence) };
+    assert(
+        at_offset < email_address_sequence.length,
+        "Email address must contain '@' exactly once",
+    );
+    assert(
+        header.get_unchecked(email_address_sequence.index + at_offset) == 0x40,
+        "Email address must contain '@' exactly once",
+    );
     for i in 0..MAX_EMAIL_ADDRESS_LENGTH {
         let index = email_address_sequence.index + i;
         if index < email_address_sequence.end_index() {
             let letter = header.get_unchecked(index);
             email_address.set_unchecked(i, letter);
+            let class = ADDRESS_CHAR_CLASS[letter as u32] as Field;
             assert(
-                EMAIL_ADDRESS_CHAR_TABLE[letter as u32] == 1,
+                (class - 1) * (i as Field - at_offset as Field) == 0,
                 "Email address must only contain acceptable characters",
             );
         }
     }
-    // todo: should probably introduce a check for @
     email_address
 }
