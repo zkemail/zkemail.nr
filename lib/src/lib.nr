@@ -11,6 +11,7 @@ mod tests;
 pub global RSA_EXPONENT: u32 = 65537;
 pub global KEY_LIMBS_1024: u32 = 9;
 pub global KEY_LIMBS_2048: u32 = 18;
+pub global KEY_LIMBS_4096: u32 = 35;
 pub global BODY_HASH_BASE64_LENGTH: u32 = 44;
 pub global CR: u8 = 0x0D;
 pub global LF: u8 = 0x0A;

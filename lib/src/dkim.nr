@@ -2,10 +2,11 @@ use crate::{
     hash::{poseidon_large, poseidon_large_padded_1024},
     KEY_LIMBS_1024,
     KEY_LIMBS_2048,
+    KEY_LIMBS_4096,
     RSA_EXPONENT,
 };
 use bignum::{params::BigNumParams, RuntimeBigNum};
-use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
+use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048, RBN4096}};
 use sha256::sha256_var;
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
@@ -124,6 +125,32 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         // change without changing hash()[1]. An honest redc, floor(2^(2 * 2048 + 6) / n) with
         // n >= 2^2047, has at most 2055 bits, i.e. at most 15 bits in this limb.
         self.redc[KEY_LIMBS_2048 - 1].assert_max_bit_size::<17>();
+    }
+}
+
+impl RSAPubkey<KEY_LIMBS_4096> {
+    pub fn verify_dkim_signature<let MAX_HEADER_LENGTH: u32>(
+        self,
+        header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+        signature: [Field; KEY_LIMBS_4096],
+    ) -> [u8; 32] {
+        // hash the header
+        let header_hash = sha256_var(header.storage(), header.len());
+
+        // verify the DKIM signature over the header
+        self.verify_digest_sha256_pkcs1v15(header_hash, signature)
+    }
+
+    /// Verify a PKCS#1 v1.5 SHA-256 signature over a precomputed digest. The caller must
+    /// constrain the digest to the signed message.
+    pub fn verify_digest_sha256_pkcs1v15(
+        self,
+        digest: [u8; 32],
+        signature: [Field; KEY_LIMBS_4096],
+    ) -> [u8; 32] {
+        let signature: RBN4096 = self.signature_bignum(signature);
+        assert(verify_sha256_pkcs1v15(digest, signature, RSA_EXPONENT));
+        digest
     }
 }
 

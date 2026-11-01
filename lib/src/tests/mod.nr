@@ -186,6 +186,27 @@ mod test_digest_verification {
     }
 }
 
+mod test_4096_bit_key {
+    use crate::tests::test_inputs::SyntheticKey4096;
+    use sha256::sha256_var;
+
+    #[test]
+    fn test_dkim_signature_4096() {
+        let message = SyntheticKey4096::MESSAGE;
+        let digest =
+            SyntheticKey4096::PUBKEY.verify_dkim_signature(message, SyntheticKey4096::SIGNATURE);
+        assert_eq(digest, sha256_var(message.storage(), message.len()));
+    }
+
+    #[test(should_fail)]
+    fn test_dkim_signature_4096_wrong_message() {
+        let mut message = SyntheticKey4096::MESSAGE;
+        message.set(0, 0);
+        let _ =
+            SyntheticKey4096::PUBKEY.verify_dkim_signature(message, SyntheticKey4096::SIGNATURE);
+    }
+}
+
 mod test_redc_binding_2048 {
     use crate::tests::test_inputs::EmailLarge;
 
