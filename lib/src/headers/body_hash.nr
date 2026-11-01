@@ -11,11 +11,13 @@ use base64::BASE64_DECODER;
 // l= is ignored, meaning we otherwise constrain the body length to be safe
 // x= is ignored, meaning we accept signatures without expiration
 // sdid= is ignored, meaning that we don't explicitly bind dkim keys to exact signing domains
-// See line 42 of this file for parsing bh=;
+// See the bh prefix check in get_body_hash_with_max_field_length for parsing bh=;
 // You will need to implement your own parsing for the tags' expected values
 
 /**
  * Constrained access to the body hash in the header
+ * DKIM-Signature fields longer than MAX_DKIM_HEADER_FIELD_LENGTH bytes (name included) are
+ * rejected; use get_body_hash_with_max_field_length to choose another cap.
  * 
  * @param MAX_HEADER_LENGTH - The maximum length of the email header
  * @param header - The email header as validated in the DKIM signature
@@ -27,9 +29,32 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     dkim_header_field_sequence: Sequence,
     body_hash_index: u32,
 ) -> [u8; 32] {
+    get_body_hash_with_max_field_length::<MAX_HEADER_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH>(
+        header,
+        dkim_header_field_sequence,
+        body_hash_index,
+    )
+}
+
+/**
+ * get_body_hash with a caller-chosen cap on the DKIM-Signature field length
+ * The field is scanned up to the cap, so circuit size grows with it. Some providers sign long
+ * DKIM-Signature fields (many h= entries), which need a larger cap than the default.
+ *
+ * @param MAX_HEADER_LENGTH - The maximum length of the email header
+ * @param MAX_DKIM_FIELD_LENGTH - The maximum length of the DKIM-Signature field, name included
+ * @param header - The email header as validated in the DKIM signature
+ * @param dkim_header_field_sequence - The sequence of the DKIM header field
+ * @param body_hash_index - The index of the body hash in the header
+ */
+pub fn get_body_hash_with_max_field_length<let MAX_HEADER_LENGTH: u32, let MAX_DKIM_FIELD_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    dkim_header_field_sequence: Sequence,
+    body_hash_index: u32,
+) -> [u8; 32] {
     // constrain the access of dkim signature field
     let header_field_name: [u8; 14] = comptime { "dkim-signature".as_bytes() };
-    constrain_header_field::<MAX_HEADER_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH, 14>(
+    constrain_header_field::<MAX_HEADER_LENGTH, MAX_DKIM_FIELD_LENGTH, 14>(
         header,
         dkim_header_field_sequence,
         header_field_name,

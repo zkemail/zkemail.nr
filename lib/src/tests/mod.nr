@@ -229,7 +229,11 @@ mod test_fold_limbs {
 
 mod header_field_access {
 
-    use crate::{headers::body_hash::get_body_hash, Sequence, tests::test_inputs::EmailLarge};
+    use crate::{
+        headers::body_hash::{get_body_hash, get_body_hash_with_max_field_length},
+        Sequence,
+        tests::test_inputs::EmailLarge,
+    };
 
     #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
     fn test_bad_body_hash_off_one_minus() {
@@ -290,10 +294,42 @@ mod header_field_access {
 
     #[test(should_fail_with = "No ':bh=' or '; bh=' prefix found before body hash")]
     fn test_malicious_body_hash_index() {
-        // tests against "dkim-signature: v=1; a=rsa-sha256; d=example.com; s=selector; c=relaxed/relaxed; q=dns/txt; t=1683849600; x=1684454400; h=from:to:subject:date; z=From:bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=@domain.com|To:recipient@example.net|Subject:Hello|Date:Thu, 11 May 2023 15:00:00 -0700; bh=2jUSOH9NhtVGCaWpZT2ncBgaamXkef9OgICHkqfsmKY=; b="
+        // tests against a z= copy of "From:bh=..." in "dkim-signature: v=1; a=rsa-sha256; d=example.com; s=selector; c=relaxed/relaxed; t=1683849600; h=from:to:subject:date; z=From:bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=@domain.com|To:recipient@example.net|Subject:Hello; bh=2jUSOH9NhtVGCaWpZT2ncBgaamXkef9OgICHkqfsmKY=; b="
         let (header, body_hash_index) = EmailLarge::tampered_dkim_field();
         let sequence: Sequence = Sequence { index: 0, length: header.len() };
         let _ = get_body_hash(header, sequence, body_hash_index);
+    }
+
+    #[test(should_fail_with = "Header field too long")]
+    fn test_long_dkim_field_default_cap() {
+        // a 331-byte field (long h= list) is over the default 300-byte cap
+        let header: BoundedVec<u8, 331> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=selector; h=from:to:subject:date:message-id:mime-version:content-type:reply-to:cc:list-unsubscribe:list-unsubscribe-post:x-campaign:x-mailer:feedback-id:in-reply-to:references:sender:list-id:x-original-sender; bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 331 }, 283);
+    }
+
+    #[test]
+    fn test_long_dkim_field_larger_cap() {
+        let header: BoundedVec<u8, 331> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=selector; h=from:to:subject:date:message-id:mime-version:content-type:reply-to:cc:list-unsubscribe:list-unsubscribe-post:x-campaign:x-mailer:feedback-id:in-reply-to:references:sender:list-id:x-original-sender; bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=; b="
+                    .as_bytes()
+            },
+        );
+        let body_hash = get_body_hash_with_max_field_length::<331, 512>(
+            header,
+            Sequence { index: 0, length: 331 },
+            283,
+        );
+        let expected: [u8; 32] = [
+            239, 20, 12, 14, 234, 21, 85, 78, 38, 209, 109, 22, 69, 84, 171, 85, 115, 30, 25, 34, 0,
+            74, 201, 238, 112, 175, 93, 38, 202, 220, 250, 245,
+        ];
+        assert_eq(body_hash, expected);
     }
 
     #[test(should_fail_with = "Header field must end with CRLF")]
@@ -409,7 +445,8 @@ mod header_field_access {
 mod test_address_extraction {
     // header field constrains are not checked here, should work same as tests in header_field_access
     use crate::{
-        headers::email_address::get_email_address,
+        headers::email_address::{get_email_address, get_email_address_with_max_field_length},
+        Sequence,
         tests::test_inputs::{EmailAddresses, EmailAddressUnderscore},
     };
 
@@ -476,6 +513,115 @@ mod test_address_extraction {
             from,
         );
         assert_eq(address, EmailAddressUnderscore::ADDRESS);
+    }
+
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_short_field_spanning_next_line() {
+        // the CRLF after "a@b" sits in the first bytes of the value
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let header: BoundedVec<u8, 31> = BoundedVec::from_array(
+            comptime { "\r\nfrom:a@b\r\nto:<victim@x.com>\r\n".as_bytes() },
+        );
+        let _ = get_email_address(
+            header,
+            Sequence { index: 2, length: 27 },
+            Sequence { index: 16, length: 12 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Header field too long")]
+    fn test_long_field_spanning_next_line() {
+        // the CRLF after a 330-byte value is past the scanned range
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let start: [u8; 7] = comptime { "\r\nfrom:".as_bytes() };
+        let end: [u8; 26] = comptime { "\r\nsubject:<victim@x.com>\r\n".as_bytes() };
+        let mut storage: [u8; 363] = [0x41; 363];
+        for i in 0..7 {
+            storage[i] = start[i];
+        }
+        for i in 0..26 {
+            storage[337 + i] = end[i];
+        }
+        let header: BoundedVec<u8, 363> = BoundedVec::from_array(storage);
+        let _ = get_email_address(
+            header,
+            Sequence { index: 2, length: 359 },
+            Sequence { index: 348, length: 12 },
+            from,
+        );
+    }
+
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_long_field_spanning_next_line_larger_cap() {
+        // with a cap that admits the field, the CRLF inside it is found
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let start: [u8; 7] = comptime { "\r\nfrom:".as_bytes() };
+        let end: [u8; 26] = comptime { "\r\nsubject:<victim@x.com>\r\n".as_bytes() };
+        let mut storage: [u8; 363] = [0x41; 363];
+        for i in 0..7 {
+            storage[i] = start[i];
+        }
+        for i in 0..26 {
+            storage[337 + i] = end[i];
+        }
+        let header: BoundedVec<u8, 363> = BoundedVec::from_array(storage);
+        let _ = get_email_address_with_max_field_length::<363, 4, 512>(
+            header,
+            Sequence { index: 2, length: 359 },
+            Sequence { index: 348, length: 12 },
+            from,
+        );
+    }
+
+    #[test]
+    fn test_long_display_name_larger_cap() {
+        // a 355-byte From field (long display name) needs more than the default 325-byte cap
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let mut storage: [u8; 355] = [0x41; 355];
+        let start: [u8; 5] = comptime { "from:".as_bytes() };
+        let end: [u8; 10] = comptime { " <a@b.com>".as_bytes() };
+        for i in 0..5 {
+            storage[i] = start[i];
+        }
+        for i in 0..10 {
+            storage[345 + i] = end[i];
+        }
+        let header: BoundedVec<u8, 355> = BoundedVec::from_array(storage);
+        let field = Sequence { index: 0, length: 355 };
+        let address_sequence = Sequence { index: 347, length: 7 };
+        let address = get_email_address_with_max_field_length::<355, 4, 512>(
+            header,
+            field,
+            address_sequence,
+            from,
+        );
+        assert_eq(address.len(), 7);
+        let expected: [u8; 7] = comptime { "a@b.com".as_bytes() };
+        for i in 0..7 {
+            assert_eq(address.get(i), expected[i]);
+        }
+    }
+
+    #[test(should_fail_with = "Header field too long")]
+    fn test_long_display_name_default_cap() {
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let mut storage: [u8; 355] = [0x41; 355];
+        let start: [u8; 5] = comptime { "from:".as_bytes() };
+        let end: [u8; 10] = comptime { " <a@b.com>".as_bytes() };
+        for i in 0..5 {
+            storage[i] = start[i];
+        }
+        for i in 0..10 {
+            storage[345 + i] = end[i];
+        }
+        let header: BoundedVec<u8, 355> = BoundedVec::from_array(storage);
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 355 },
+            Sequence { index: 347, length: 7 },
+            from,
+        );
     }
 
     #[test(should_fail_with = "Email address must start immediately after '<' if bracket is present")]

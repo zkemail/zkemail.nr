@@ -18,6 +18,9 @@ fn check_header_field_bounds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LE
     header_field_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) {
+    // the field must fit in the range scanned by the callers
+    assert(header_field_sequence.length <= MAX_HEADER_FIELD_LENGTH, "Header field too long");
+
     // check the range of the sequence is within the header (so we can use get_unchecked)
     let end_index = header_field_sequence.end_index();
     assert(end_index <= header.len(), "Header field out of bounds of header");
@@ -104,7 +107,7 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
     // check the header field is uninterrupted
     let mut last_angle_bracket = 0;
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
-    for i in (HEADER_FIELD_NAME_LENGTH + 1)..MAX_HEADER_FIELD_LENGTH {
+    for i in 0..(MAX_HEADER_FIELD_LENGTH - HEADER_FIELD_NAME_LENGTH - 1) {
         // is it safe enough to cut this constraint cost in half by not checking lf? i think so
         let index = start_index + i;
         if (index < header_field_sequence.end_index()) {
