@@ -183,6 +183,29 @@ mod test_redc_binding_2048 {
             "redc hash (hash[1]) must change when redc is modified",
         );
     }
+
+    /// From zkemail/zkemail.nr#67 (Divide-By-0). poseidon_large only hashes the low 17 bits of
+    /// redc[17] (17 x 121-bit repacking), so any higher bit set there must be rejected by
+    /// validate_in_range, or redc would not be bound by hash()[1].
+    #[test(should_fail)]
+    fn test_redc_top_limb_bits_outside_hash_are_rejected_2048() {
+        let pubkey = EmailLarge::PUBKEY;
+        let mut tampered_redc = pubkey.redc;
+        tampered_redc[17] = tampered_redc[17] + 131072; // 1 << 17: lowest bit the hash ignores
+        let tampered_pubkey = crate::dkim::RSAPubkey::new(pubkey.modulus, tampered_redc);
+        let _ = tampered_pubkey.hash();
+    }
+
+    /// From zkemail/zkemail.nr#67 (Divide-By-0). Guard: the largest top limb the hash covers
+    /// (17 bits) is still accepted. Honest keys use at most 15 bits there (2048-bit modulus,
+    /// 2^(2k+6) redc; see js/tests/redc-bound.test.ts).
+    #[test]
+    fn test_redc_top_limb_17_bits_accepted_2048() {
+        let pubkey = EmailLarge::PUBKEY;
+        let mut redc = pubkey.redc;
+        redc[17] = 131071; // 2^17 - 1
+        let _ = crate::dkim::RSAPubkey::new(pubkey.modulus, redc).hash();
+    }
 }
 
 mod test_redc_binding_1024 {

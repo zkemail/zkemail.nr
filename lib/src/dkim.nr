@@ -99,7 +99,11 @@ impl RSAPubkey<KEY_LIMBS_2048> {
             self.redc[i].assert_max_bit_size::<120>();
         }
         self.modulus[KEY_LIMBS_2048 - 1].assert_max_bit_size::<2048 - ((KEY_LIMBS_2048 - 1) * 120)>();
-        self.redc[KEY_LIMBS_2048 - 1].assert_max_bit_size::<120>(); // we get 2053 sometimes?
+        // poseidon_large repacks the 18 x 120-bit limbs into 17 x 121-bit limbs, so it hashes only
+        // the low 17 bits of the top limb. With a 120-bit bound, bits 17..119 of redc[17] could
+        // change without changing hash()[1]. An honest redc, floor(2^(2 * 2048 + 6) / n) with
+        // n >= 2^2047, has at most 2055 bits, i.e. at most 15 bits in this limb.
+        self.redc[KEY_LIMBS_2048 - 1].assert_max_bit_size::<17>();
     }
 }
 
