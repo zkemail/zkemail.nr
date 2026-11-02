@@ -787,7 +787,8 @@ mod test_header_field_boundaries {
 mod test_address_early_value_boundaries {
     use crate::{
         headers::{
-            constrain_header_field_detect_last_angle_bracket, email_address::get_email_address,
+            constrain_header_field_detect_last_angle_bracket,
+            email_address::{get_email_address, get_email_address_with_max_field_length},
         },
         Sequence,
     };
@@ -804,6 +805,77 @@ mod test_address_early_value_boundaries {
             header,
             Sequence { index: 2, length: 27 },
             Sequence { index: 16, length: 12 },
+            from,
+        );
+    }
+
+    // With a cap that admits the run-on field, the CRLF inside it is still found.
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_long_from_field_running_into_next_line_larger_cap_rejected() {
+        let start: [u8; 7] = comptime { "\r\nfrom:".as_bytes() };
+        let end: [u8; 26] = comptime { "\r\nsubject:<victim@x.com>\r\n".as_bytes() };
+        let mut storage: [u8; 363] = [0x41; 363];
+        for i in 0..7 {
+            storage[i] = start[i];
+        }
+        for i in 0..26 {
+            storage[337 + i] = end[i];
+        }
+        let header: BoundedVec<u8, 363> = BoundedVec::from_array(storage);
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address_with_max_field_length::<363, 4, 512>(
+            header,
+            Sequence { index: 2, length: 359 },
+            Sequence { index: 348, length: 12 },
+            from,
+        );
+    }
+
+    // A 355-byte From field (long display name) is over the default cap and is extracted with a
+    // larger one.
+    #[test]
+    fn test_long_display_name_with_larger_cap_accepted() {
+        let mut storage: [u8; 355] = [0x41; 355];
+        let start: [u8; 5] = comptime { "from:".as_bytes() };
+        let end: [u8; 10] = comptime { " <a@b.com>".as_bytes() };
+        for i in 0..5 {
+            storage[i] = start[i];
+        }
+        for i in 0..10 {
+            storage[345 + i] = end[i];
+        }
+        let header: BoundedVec<u8, 355> = BoundedVec::from_array(storage);
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let address = get_email_address_with_max_field_length::<355, 4, 512>(
+            header,
+            Sequence { index: 0, length: 355 },
+            Sequence { index: 347, length: 7 },
+            from,
+        );
+        let expected: [u8; 7] = comptime { "a@b.com".as_bytes() };
+        assert_eq(address.len(), 7);
+        for i in 0..7 {
+            assert_eq(address.get(i), expected[i]);
+        }
+    }
+
+    #[test(should_fail_with = "Header field too long")]
+    fn test_long_display_name_default_cap_rejected() {
+        let mut storage: [u8; 355] = [0x41; 355];
+        let start: [u8; 5] = comptime { "from:".as_bytes() };
+        let end: [u8; 10] = comptime { " <a@b.com>".as_bytes() };
+        for i in 0..5 {
+            storage[i] = start[i];
+        }
+        for i in 0..10 {
+            storage[345 + i] = end[i];
+        }
+        let header: BoundedVec<u8, 355> = BoundedVec::from_array(storage);
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 355 },
+            Sequence { index: 347, length: 7 },
             from,
         );
     }

@@ -16,6 +16,9 @@ use base64::BASE64_DECODER;
 
 /**
  * Constrained access to the body hash in the header
+ * DKIM-Signature fields whose value (after "dkim-signature:") is longer than
+ * MAX_DKIM_HEADER_FIELD_LENGTH bytes are rejected; use get_body_hash_with_max_field_length to
+ * choose another cap.
  * 
  * @param MAX_HEADER_LENGTH - The maximum length of the email header
  * @param header - The email header as validated in the DKIM signature
@@ -27,9 +30,34 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     dkim_header_field_sequence: Sequence,
     body_hash_index: u32,
 ) -> [u8; 32] {
+    get_body_hash_with_max_field_length::<MAX_HEADER_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH>(
+        header,
+        dkim_header_field_sequence,
+        body_hash_index,
+    )
+}
+
+/**
+ * get_body_hash with a caller-chosen cap on the DKIM-Signature field value
+ * The field is scanned up to the cap, so circuit size grows with it (about 28 gates per byte).
+ * Providers that sign many headers (long h= lists) or keep folds (c=simple) can need a larger cap
+ * than the default; a smaller one gives a smaller circuit.
+ *
+ * @param MAX_HEADER_LENGTH - The maximum length of the email header
+ * @param MAX_DKIM_FIELD_LENGTH - The maximum length of the DKIM-Signature field value, after
+ *        "dkim-signature:"
+ * @param header - The email header as validated in the DKIM signature
+ * @param dkim_header_field_sequence - The sequence of the DKIM header field
+ * @param body_hash_index - The index of the body hash in the header
+ */
+pub fn get_body_hash_with_max_field_length<let MAX_HEADER_LENGTH: u32, let MAX_DKIM_FIELD_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    dkim_header_field_sequence: Sequence,
+    body_hash_index: u32,
+) -> [u8; 32] {
     // constrain the access of dkim signature field
     let header_field_name: [u8; 14] = comptime { "dkim-signature".as_bytes() };
-    constrain_header_field::<MAX_HEADER_LENGTH, MAX_DKIM_HEADER_FIELD_LENGTH, 14>(
+    constrain_header_field::<MAX_HEADER_LENGTH, MAX_DKIM_FIELD_LENGTH, 14>(
         header,
         dkim_header_field_sequence,
         header_field_name,
