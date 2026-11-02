@@ -134,22 +134,14 @@ pub fn constrain_header_field<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_L
     // (Measured on examples/verify_email_2048_bit_dkim: ~12k fewer ACIR opcodes than three reads.)
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
     let end_index = header_field_sequence.end_index();
-    let mut expect_lf = false; // previous field byte was CR
-    let mut expect_wsp = false; // previous two field bytes were CRLF
+    let mut folds = FoldCheck::new();
     for i in 0..MAX_HEADER_FIELD_LENGTH {
         let index = start_index + i;
         if (index < end_index) {
-            let byte = header.get_unchecked(index);
-            let lf_ok = !expect_lf | (byte == LF);
-            let wsp_ok = !expect_wsp | (byte == 0x20) | (byte == 0x09);
-            assert(lf_ok & wsp_ok, "Header field must not contain newlines");
-            expect_wsp = expect_lf;
-            expect_lf = byte == CR;
+            folds.check(header.get_unchecked(index));
         }
     }
-    // REASON: a fold must be complete inside the field. Otherwise a field ending in CR or CRLF
-    // could be "completed" by bytes outside it (including unconstrained padding past header.len()).
-    assert(!expect_lf & !expect_wsp, "Header field must not contain newlines");
+    folds.finish();
 }
 
 // Lowercase an ASCII letter; every other byte is returned unchanged.
@@ -158,6 +150,44 @@ fn to_ascii_lowercase(byte: u8) -> u8 {
         byte + 0x20
     } else {
         byte
+    }
+}
+
+// Line-break check shared by the field scans: a CR is allowed only as the start of a complete
+// fold, CRLF followed by SP or HTAB. The two carried flags are Fields (0 or 1), and each check is
+// a product that is zero when the flag is clear or the byte is one of the allowed ones. This costs
+// fewer gates per byte than the same checks written as boolean selects.
+struct FoldCheck {
+    expect_lf: Field, // previous field byte was CR
+    expect_wsp: Field, // previous two field bytes were CRLF
+}
+
+impl FoldCheck {
+    fn new() -> Self {
+        FoldCheck { expect_lf: 0, expect_wsp: 0 }
+    }
+
+    fn check(&mut self, byte: u8) {
+        let byte = byte as Field;
+        assert(
+            self.expect_lf * (byte - LF as Field) == 0,
+            "Header field must not contain newlines",
+        );
+        assert(
+            self.expect_wsp * (byte - 0x20) * (byte - 0x09) == 0,
+            "Header field must not contain newlines",
+        );
+        self.expect_wsp = self.expect_lf;
+        self.expect_lf = (byte == CR as Field) as Field;
+    }
+
+    // REASON: a fold must be complete inside the field. Otherwise a field ending in CR or CRLF
+    // could be "completed" by bytes outside it (including unconstrained padding past header.len()).
+    fn finish(self) {
+        assert(
+            (self.expect_lf == 0) & (self.expect_wsp == 0),
+            "Header field must not contain newlines",
+        );
     }
 }
 
@@ -181,23 +211,17 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
     // Like constrain_header_field, a line break is allowed only as a complete CRLF + WSP fold.
     let mut last_angle_bracket = 0;
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
-    let mut expect_lf = false;
-    let mut expect_wsp = false;
+    let mut folds = FoldCheck::new();
     for i in 0..MAX_HEADER_FIELD_LENGTH {
         let index = start_index + i;
         if (index < header_field_sequence.end_index()) {
             let byte = header.get_unchecked(index);
-            assert(
-                (!expect_lf | (byte == LF)) & (!expect_wsp | (byte == 0x20) | (byte == 0x09)),
-                "Header field must not contain newlines",
-            );
-            expect_wsp = expect_lf;
-            expect_lf = byte == CR;
+            folds.check(byte);
             if byte == 0x3c {
                 last_angle_bracket = index;
             }
         }
     }
-    assert(!expect_lf & !expect_wsp, "Header field must not contain newlines");
+    folds.finish();
     last_angle_bracket
 }
