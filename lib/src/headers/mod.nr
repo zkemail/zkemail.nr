@@ -78,10 +78,20 @@ fn check_header_field_bounds<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LE
     // NOTE: field names are case-insensitive (RFC 5322 s1.2.2). relaxed header canonicalization
     // lowercases them, but c=simple keeps the original case (e.g. "DKIM-Signature", "From"), which
     // an exact byte match rejected. Only A-Z are folded, so no other byte can alias a name byte.
+    // NOTE: each header byte is compared with both cases of the expected byte, as a product of two
+    // differences (one equality for a non-letter, whose two cases are the same byte). This accepts
+    // exactly the bytes whose lowercase equals the expected byte's lowercase, and is cheaper than
+    // lowercasing every header byte.
     for i in 0..HEADER_FIELD_NAME_LENGTH {
+        let lower = to_ascii_lowercase(header_field_name[i]);
+        let upper = if (lower >= 0x61) & (lower <= 0x7a) {
+            lower - 0x20
+        } else {
+            lower
+        };
+        let byte = header.get_unchecked(header_field_sequence.index + i) as Field;
         assert(
-            to_ascii_lowercase(header.get_unchecked(header_field_sequence.index + i))
-                == to_ascii_lowercase(header_field_name[i]),
+            (byte - lower as Field) * (byte - upper as Field) == 0,
             "Header field name does not match",
         );
     }
