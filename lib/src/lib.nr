@@ -9,8 +9,8 @@ pub mod utils;
 mod tests;
 
 global RSA_EXPONENT: u32 = 65537;
-global KEY_LIMBS_1024: u32 = 9;
-global KEY_LIMBS_2048: u32 = 18;
+pub global KEY_LIMBS_1024: u32 = 9;
+pub global KEY_LIMBS_2048: u32 = 18;
 global BODY_HASH_BASE64_LENGTH: u32 = 44;
 global CR: u8 = 0x0D;
 global LF: u8 = 0x0A;
@@ -19,11 +19,11 @@ global LF: u8 = 0x0A;
 // real DKIM-Signature fields routinely exceed 300 bytes. Each extra byte costs a few constraints in
 // get_body_hash's line-break scan.
 global MAX_DKIM_HEADER_FIELD_LENGTH: u32 = 1024;
-global MAX_EMAIL_ADDRESS_LENGTH: u32 = 320; // derived via (https://datatracker.ietf.org/doc/html/rfc5321#section-4.5.3.1.1)
+pub global MAX_EMAIL_ADDRESS_LENGTH: u32 = 320; // derived via (https://datatracker.ietf.org/doc/html/rfc5321#section-4.5.3.1.1)
 
 pub struct Sequence {
-    index: u32,
-    length: u32,
+    pub index: u32,
+    pub length: u32,
 }
 
 impl Sequence {

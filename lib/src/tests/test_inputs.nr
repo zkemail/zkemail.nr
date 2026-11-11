@@ -71,6 +71,7 @@ pub(crate) mod EmailLarge {
         99, 107, 115, 46, 13, 10,
     ]);
 
+    // redc = floor(2^(2 * 2048 + 6) / modulus), as BigNum v0.11 expects
     pub(crate) global PUBKEY: RSAPubkey<KEY_LIMBS_2048> = RSAPubkey::new(
         [
             0xe5cf995b5ef59ce9943d1f4209b6ab,
@@ -93,24 +94,24 @@ pub(crate) mod EmailLarge {
             0xd5,
         ],
         [
-            0x48a824e4ebc7e0f1059f3ecfa57c46,
-            0x5c1db23f3c7d47ad7e7d7cfda5189a,
-            0x9bb6bbbd8facf011f022fa9051aec0,
-            0x4faa4cef474bed639362ea71f7a217,
-            0x503aa50b77e24b030841a7d0615812,
-            0xbbf4e62805e1860a904c0f66a5fad1,
-            0xcbd24b72442d2ce647dd7d0a443685,
-            0x74a8839a4460c169dce7138efdaef5,
-            0xf06e09e3191b995b08e5b45182f650,
-            0x1fad4a89f8369fe10e5d4b6e149a10,
-            0xc778b15982d11ebf7fe23b4e15f105,
-            0x09ff3a4567077510c474e4ac0a21ad,
-            0x37e69e5dbb77167b73065e4c5ad6aa,
-            0xcf4774e22e7fe3a38642186f7ae74b,
-            0x6e72b5eb4c813a3b37998083aab81e,
-            0x48e7050aa8abedce5a45c169853761,
-            0xd3285e53b322b221f7bcf4f8f8ad8a,
-            0x132d,
+            0x22a09393af1f83c4167cfb3e95f118,
+            0x7076c8fcf1f51eb5f9f5f3f6946269,
+            0x6edaeef63eb3c047c08bea4146bb01,
+            0x3ea933bd1d2fb58e4d8ba9c7de885e,
+            0x40ea942ddf892c0c21069f41856049,
+            0xefd398a01786182a41303d9a97eb45,
+            0x2f492dc910b4b3991f75f42910da16,
+            0xd2a20e69118305a7739c4e3bf6bbd7,
+            0xc1b8278c646e656c2396d1460bd941,
+            0x7eb52a27e0da7f8439752db8526843,
+            0x1de2c5660b447afdff88ed3857c414,
+            0x27fce9159c1dd44311d392b02886b7,
+            0xdf9a7976eddc59edcc1979316b5aa8,
+            0x3d1dd388b9ff8e8e190861bdeb9d2c,
+            0xb9cad7ad3204e8ecde66020eaae07b,
+            0x239c142aa2afb739691705a614dd85,
+            0x4ca1794ecc8ac887def3d3e3e2b629,
+            0x4cb7,
         ],
     );
     pub(crate) global SIGNATURE: [Field; KEY_LIMBS_2048] = [
