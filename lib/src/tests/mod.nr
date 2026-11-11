@@ -25,7 +25,7 @@ mod test_success {
         );
         // compute the body hash
         let computed_body_hash: [u8; 32] =
-            sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len() as u64);
+            sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len());
         // compare the body hashes
         assert(
             signed_body_hash == computed_body_hash,
@@ -109,8 +109,7 @@ mod test_tampered_hash {
         // get tampered body
         let mut tampered_body = unsafe { EmailLarge::tampered_body() };
         // compute the body hash
-        let tampered_body_hash: [u8; 32] =
-            sha256_var(tampered_body.storage(), tampered_body.len() as u64);
+        let tampered_body_hash: [u8; 32] = sha256_var(tampered_body.storage(), tampered_body.len());
         // compare the body hashes
         assert(
             signed_body_hash != tampered_body_hash,
@@ -170,7 +169,7 @@ mod test_redc_binding_2048 {
     }
 
     /// Guard: the largest top limb the hash covers (17 bits) is still accepted. Honest keys use
-    /// at most 13 bits there (2048-bit modulus, 2^(2k+4) redc; see js/tests/redc-bound.test.ts).
+    /// at most 15 bits there (2048-bit modulus, 2^(2k+6) redc; see js/tests/redc-bound.test.ts).
     #[test]
     fn test_redc_top_limb_17_bits_accepted_2048() {
         let pubkey = EmailLarge::PUBKEY;
@@ -237,7 +236,7 @@ mod header_field_access {
         // create header field for malicious bh
         let mut dkim_field: BoundedVec<u8, EmailLarge::EMAIL_LARGE_MAX_HEADER_LENGTH> =
             BoundedVec::new();
-        dkim_field.len = EmailLarge::HEADER.len();
+        dkim_field = BoundedVec::from_parts(dkim_field.storage(), EmailLarge::HEADER.len());
         // craft a malicious "to" field where attacker tries to put bh in display name
         let mut malicious_to: [u8; 78] = comptime {
             "\r\nto:\"bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\" <zkewtest@gmail.com>\r\n"
@@ -249,7 +248,7 @@ mod header_field_access {
         };
         for i in 0..malicious_to.len() {
             let index = malicious_sequence.index + i - 2;
-            dkim_field.storage[index] = malicious_to[i];
+            dkim_field.set_unchecked(index, malicious_to[i]);
         }
         let malicious_body_hash_index = 15;
         // copy the body hash to the beginning of the
@@ -263,7 +262,7 @@ mod header_field_access {
             "dkim-signature:bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; v=1; a=rsa-sha256; c=relaxed/relaxed; d=icloud.com; s=1a1hai; t=1712141644; h=from:Content-Type:Mime-Version:Subject:Message-Id:Date:to; b="
                 .as_bytes()
         };
-        let header: BoundedVec<u8, 203> = BoundedVec { storage: dkim_field, len: 203 };
+        let header: BoundedVec<u8, 203> = BoundedVec::from_array(dkim_field);
         let mut dkim_field_sequence = Sequence { index: 0, length: 203 };
         let body_hash_index = 18;
         let _ = get_body_hash(header, dkim_field_sequence, body_hash_index);
@@ -284,7 +283,7 @@ mod header_field_access {
         overflowed_sequence.length = overflowed_sequence.length + 1;
         // set header len to be a bit longer so it doesn't overflow
         let mut longer_header = EmailLarge::HEADER;
-        longer_header.len = longer_header.len + 2;
+        longer_header = BoundedVec::from_parts(longer_header.storage(), longer_header.len() + 2);
         // attempt to get body hash
         let _ = get_body_hash(
             longer_header,
@@ -343,7 +342,8 @@ mod header_field_access {
                 + EmailLarge::DKIM_HEADER_SEQUENCE.length
                 + 2, // 2 for crlf in middle
         };
-        tampered_header.len = combined_sequence.length + 4;
+        tampered_header =
+            BoundedVec::from_parts(tampered_header.storage(), combined_sequence.length + 4);
         // copy dkim-signature field
         for i in 0..EmailLarge::DKIM_HEADER_SEQUENCE.length + 2 {
             tampered_header.set(
@@ -373,8 +373,10 @@ mod header_field_access {
     fn test_header_field_outside_header() {
         let mut shortened_header = EmailLarge::HEADER;
         // shorten header to be just under the end of the dkim field
-        shortened_header.len =
-            EmailLarge::DKIM_HEADER_SEQUENCE.index + EmailLarge::DKIM_HEADER_SEQUENCE.length - 1;
+        shortened_header = BoundedVec::from_parts(
+            shortened_header.storage(),
+            EmailLarge::DKIM_HEADER_SEQUENCE.index + EmailLarge::DKIM_HEADER_SEQUENCE.length - 1,
+        );
         // attempt to get body hash
         let _ = get_body_hash(
             shortened_header,
@@ -583,7 +585,7 @@ mod test_header_field_canonicalization {
     #[test(should_fail_with = "Header field must not contain newlines")]
     fn test_fold_completed_by_padding_rejected() {
         let storage: [u8; 16] = comptime { "x-test:a\r\n zzzzz".as_bytes() };
-        let header: BoundedVec<u8, 16> = BoundedVec::from_parts_unchecked(storage, 9);
+        let header: BoundedVec<u8, 16> = BoundedVec::from_parts(storage, 9);
         let name: [u8; 6] = comptime { "x-test".as_bytes() };
         constrain_header_field::<16, 32, 6>(header, Sequence { index: 0, length: 9 }, name);
     }
@@ -752,7 +754,7 @@ mod test_header_field_boundaries {
     #[test(should_fail_with = "Header field too short to contain name and colon")]
     fn test_field_shorter_than_name_rejected() {
         let storage: [u8; 16] = comptime { "\r\nfrom:a@b.cd   ".as_bytes() };
-        let header: BoundedVec<u8, 16> = BoundedVec::from_parts_unchecked(storage, 4);
+        let header: BoundedVec<u8, 16> = BoundedVec::from_parts(storage, 4);
         let from: [u8; 4] = comptime { "from".as_bytes() };
         constrain_header_field::<16, 32, 4>(header, Sequence { index: 2, length: 2 }, from);
     }
@@ -865,7 +867,7 @@ mod test_body_hash_authenticated_length {
         let storage: [u8; 64] = comptime {
             "dkim-signature:bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;X".as_bytes()
         };
-        let header: BoundedVec<u8, 64> = BoundedVec::from_parts_unchecked(storage, 62);
+        let header: BoundedVec<u8, 64> = BoundedVec::from_parts(storage, 62);
         let _ = get_body_hash(header, Sequence { index: 0, length: 62 }, 18);
     }
 
@@ -1117,7 +1119,7 @@ mod test_masking {
     #[test]
     fn test_mask_text_zeroes_bytes_past_len() {
         let text: BoundedVec<u8, 8> =
-            BoundedVec::from_parts_unchecked([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
+            BoundedVec::from_parts([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
         let masked = mask_text(text, [true; 8]);
         assert(masked == [0x61, 0x62, 0x63, 0x64, 0, 0, 0, 0]);
     }
@@ -1125,7 +1127,7 @@ mod test_masking {
     #[test]
     fn test_mask_text_applies_mask_within_len() {
         let text: BoundedVec<u8, 8> =
-            BoundedVec::from_parts_unchecked([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
+            BoundedVec::from_parts([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
         let masked = mask_text(text, [true, false, true, false, true, true, true, true]);
         assert(masked == [0x61, 0, 0x63, 0, 0, 0, 0, 0]);
     }
