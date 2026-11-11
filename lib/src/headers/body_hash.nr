@@ -55,23 +55,18 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
 
     // check bh prefix: "bh=" must start a tag, i.e. follow the field's ':' or a tag-separating ';',
     // optionally with one space or a fold (CRLF + SP/HTAB, kept by c=simple canonicalization).
-    let bh_prefix_first_no_space: [u8; 5] = comptime { "e:bh=".as_bytes() };
-    let bh_prefix_space: [u8; 5] = comptime { ": bh=".as_bytes() };
-    let bh_prefix_subsequent: [u8; 5] = comptime { "; bh=".as_bytes() };
-    let mut found_first_no_space = true;
-    let mut found_first_space = true;
-    let mut found_subsequent = true;
-    for i in 0..5 {
-        let character = header.get_unchecked(body_hash_index - 5 + i);
-        // NOTE: byte 0 ('e') is skipped. At the anchored position below it is the last byte of the
-        // name, already matched case-insensitively, and c=simple keeps e.g. "DKIM-SIGNATURE:bh=",
-        // which an exact lowercase 'e' rejected.
-        found_first_no_space =
-            found_first_no_space & ((i == 0) | (character == bh_prefix_first_no_space[i]));
-        found_first_space = found_first_space & (character == bh_prefix_space[i]);
-        let match_subsequent = character == bh_prefix_subsequent[i];
-        found_subsequent = found_subsequent & match_subsequent;
+    // NOTE: the 7 bytes before the value are read once. Every accepted form ends in "bh=", and
+    // the bytes before it are compared as packed Fields (bytes are < 256, so packing is
+    // injective): one equality per form instead of one per byte.
+    // NOTE: these 7 bytes can't start before the field: "bh=" can't overlap the 15-byte
+    // "dkim-signature:" name (checked above), so body_hash_index - 7 >= field index + 11. A
+    // body_hash_index too small for the subtraction makes the circuit fail, never pass.
+    let mut b: [Field; 7] = [0; 7];
+    for i in 0..7 {
+        b[i] = header.get_unchecked(body_hash_index - 7 + i) as Field;
     }
+    let ends_with_bh = b[4] * 0x10000 + b[5] * 0x100 + b[6] == 0x62683d; // "bh="
+    let sep2 = b[2] * 0x100 + b[3];
     // REASON: ":bh=" / ": bh=" only mean "first tag" right after the "dkim-signature:" name.
     // ':' is legal inside tag values: z= copies sender-controlled header fields as "Name:value"
     // with '=' escaped as "=3D", so a copied "Date:bh..." reads "e:bh=3D..." mid-field, and the
@@ -79,30 +74,18 @@ pub fn get_body_hash<let MAX_HEADER_LENGTH: u32>(
     // bytes with the literal '=' padding the base64 decoder requires followed by ';', so this was
     // not reachable end to end; the anchor makes the check mean what it says. The two forms are
     // also matched as separate flags: OR-ing them per byte accepted mixes such as "::bh=".
+    // The byte before ":bh=" is the last byte of the name, already matched case-insensitively
+    // (c=simple keeps e.g. "DKIM-SIGNATURE:bh="), so it is not compared again.
     let name_end = dkim_header_field_sequence.index + 15; // "dkim-signature:" is 15 bytes
-    let found_first = (found_first_no_space & (body_hash_index == name_end + 3))
-        | (found_first_space & (body_hash_index == name_end + 4));
-    // ";bh=" (no space after the separator)
-    let bh_prefix_no_space: [u8; 4] = comptime { ";bh=".as_bytes() };
-    let mut found_no_space = true;
-    for i in 0..4 {
-        found_no_space = found_no_space
-            & (header.get_unchecked(body_hash_index - 4 + i) == bh_prefix_no_space[i]);
-    }
+    let found_first = ((b[3] == 0x3a) & (body_hash_index == name_end + 3)) // ":bh="
+        | ((sep2 == 0x3a20) & (body_hash_index == name_end + 4)); // ": bh="
+    // "; bh=" and ";bh="
+    let found_subsequent = (sep2 == 0x3b20) | (b[3] == 0x3b);
     // ";\r\n\tbh=" / ";\r\n bh=" (folded after the separator)
-    // NOTE: these 7 bytes can't start before the field: "bh=" can't overlap the 15-byte
-    // "dkim-signature:" name (checked above), so body_hash_index - 7 >= field index + 11. A
-    // body_hash_index too small for the subtraction makes the circuit fail, never pass.
-    let bh_prefix_folded_tab: [u8; 7] = comptime { ";\r\n\tbh=".as_bytes() };
-    let bh_prefix_folded_space: [u8; 7] = comptime { ";\r\n bh=".as_bytes() };
-    let mut found_folded = true;
-    for i in 0..7 {
-        let character = header.get_unchecked(body_hash_index - 7 + i);
-        found_folded = found_folded
-            & ((character == bh_prefix_folded_tab[i]) | (character == bh_prefix_folded_space[i]));
-    }
+    let found_folded =
+        (b[0] * 0x10000 + b[1] * 0x100 + b[2] == 0x3b0d0a) & ((b[3] - 0x20) * (b[3] - 0x09) == 0);
     assert(
-        found_first | found_subsequent | found_no_space | found_folded,
+        ends_with_bh & (found_first | found_subsequent | found_folded),
         "No ':bh=' or '; bh=' prefix found before body hash",
     );
 

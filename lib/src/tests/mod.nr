@@ -768,6 +768,18 @@ mod test_header_field_boundaries {
         );
         let _ = get_body_hash(header, Sequence { index: 0, length: 71 }, 23);
     }
+
+    // An earlier DKIM-Signature field listed in h= carries a different bh=; it must not be usable.
+    #[test(should_fail_with = "DKIM-Signature field must be the last header field")]
+    fn test_body_hash_from_earlier_signed_dkim_signature_rejected() {
+        let header: BoundedVec<u8, 136> = BoundedVec::from_array(
+            comptime {
+                "dkim-signature:bh=7xQMDuoVVU4m0W0WRVSrVXMeGSIASsnucK9dJsrc+vU=;\r\ndkim-signature:v=1; bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; b="
+                    .as_bytes()
+            },
+        );
+        let _ = get_body_hash(header, Sequence { index: 0, length: 63 }, 18);
+    }
 }
 
 // The address-specific field scan must inspect the first byte of the value. These inputs use
@@ -779,6 +791,45 @@ mod test_address_early_value_boundaries {
         },
         Sequence,
     };
+
+    // A CRLF in the first value bytes must end the field, so the address cannot come from the
+    // next line.
+    #[test(should_fail_with = "Header field must not contain newlines")]
+    fn test_from_field_running_into_next_line_rejected() {
+        let header: BoundedVec<u8, 31> = BoundedVec::from_array(
+            comptime { "\r\nfrom:a@b\r\nto:<victim@x.com>\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 2, length: 27 },
+            Sequence { index: 16, length: 12 },
+            from,
+        );
+    }
+
+    // A From field longer than the scan window is rejected, so an address on a later line (here
+    // in the Subject) cannot be selected past the scanned bytes.
+    #[test(should_fail_with = "Header field too long")]
+    fn test_long_from_field_running_into_next_line_rejected() {
+        let start: [u8; 7] = comptime { "\r\nfrom:".as_bytes() };
+        let end: [u8; 26] = comptime { "\r\nsubject:<victim@x.com>\r\n".as_bytes() };
+        let mut storage: [u8; 363] = [0x41; 363];
+        for i in 0..7 {
+            storage[i] = start[i];
+        }
+        for i in 0..26 {
+            storage[337 + i] = end[i];
+        }
+        let header: BoundedVec<u8, 363> = BoundedVec::from_array(storage);
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 2, length: 359 },
+            Sequence { index: 348, length: 12 },
+            from,
+        );
+    }
 
     #[test(should_fail_with = "Email address must start immediately after '<' if bracket is present")]
     fn test_early_angle_bracket_cannot_select_later_address() {
