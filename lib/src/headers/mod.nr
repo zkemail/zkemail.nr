@@ -152,13 +152,33 @@ fn to_ascii_lowercase(byte: u8) -> u8 {
 }
 
 /**
- * constrain_header_field with checks for the last occurence of "<" inside the loop to save constraints
+ * constrain_header_field with checks for the last occurence of "<" inside the loop to save constraints.
+ * Also rejects backslashes, '(' outside a quoted string and an unclosed quoted string, so the field
+ * holds no comment or quoted-pair (see scan_address_field).
  */
 pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
     header: BoundedVec<u8, MAX_HEADER_LENGTH>,
     header_field_sequence: Sequence,
     header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
 ) -> u32 {
+    let (last_angle_bracket, _) = scan_address_field::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
+        header,
+        header_field_sequence,
+        header_field_name,
+    );
+    last_angle_bracket
+}
+
+/**
+ * constrain_header_field_detect_last_angle_bracket, also returning the index of the last value byte
+ * that is not folding whitespace (SP, HTAB, or the CRLF of a fold), or 0 if there is none.
+ * get_email_address uses it to require that the selected address ends the field.
+ */
+pub(crate) fn scan_address_field<let MAX_HEADER_LENGTH: u32, let MAX_HEADER_FIELD_LENGTH: u32, let HEADER_FIELD_NAME_LENGTH: u32>(
+    header: BoundedVec<u8, MAX_HEADER_LENGTH>,
+    header_field_sequence: Sequence,
+    header_field_name: [u8; HEADER_FIELD_NAME_LENGTH],
+) -> (u32, u32) {
     // constrain beginning of header field
     check_header_field_bounds::<MAX_HEADER_LENGTH, MAX_HEADER_FIELD_LENGTH, HEADER_FIELD_NAME_LENGTH>(
         header,
@@ -169,7 +189,13 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
     // Scan the entire value. start_index already skips "<name>:", so starting the loop at the
     // name length again would leave the first value bytes unchecked, including an early '<' or CR.
     // Like constrain_header_field, a line break is allowed only as a complete CRLF + WSP fold.
+    // REASON: a '<' inside a comment or quoted string must not be taken for the start of the
+    // angle-addr. With no backslash there is no quoted-pair, so every '"' opens or closes a quoted
+    // string and the parity bit `quoted` is exact; with no '(' outside a quoted string there is no
+    // comment. A '(' inside a quoted string is plain text ("Doe, John (Sales)" <jd@corp.com>).
     let mut last_angle_bracket = 0;
+    let mut last_non_fws = 0;
+    let mut quoted = false;
     let start_index = header_field_sequence.index + HEADER_FIELD_NAME_LENGTH + 1;
     let mut expect_lf = false;
     let mut expect_wsp = false;
@@ -177,17 +203,27 @@ pub fn constrain_header_field_detect_last_angle_bracket<let MAX_HEADER_LENGTH: u
         let index = start_index + i;
         if (index < header_field_sequence.end_index()) {
             let byte = header.get_unchecked(index);
+            let is_cr = byte == CR;
+            let is_wsp = (byte == 0x20) | (byte == 0x09);
             assert(
-                (!expect_lf | (byte == LF)) & (!expect_wsp | (byte == 0x20) | (byte == 0x09)),
+                (!expect_lf | (byte == LF)) & (!expect_wsp | is_wsp),
                 "Header field must not contain newlines",
             );
+            assert(byte != 0x5c, "Address fields must not contain backslashes");
+            assert(quoted | (byte != 0x28), "Address fields must not contain comments");
+            quoted = quoted != (byte == 0x22);
+            // the LF of a fold is the byte after its CR (checked above), so it is `expect_lf`
+            if !(is_wsp | is_cr | expect_lf) {
+                last_non_fws = index;
+            }
             expect_wsp = expect_lf;
-            expect_lf = byte == CR;
+            expect_lf = is_cr;
             if byte == 0x3c {
                 last_angle_bracket = index;
             }
         }
     }
     assert(!expect_lf & !expect_wsp, "Header field must not contain newlines");
-    last_angle_bracket
+    assert(!quoted, "Address fields must not end inside a quoted string");
+    (last_angle_bracket, last_non_fws)
 }

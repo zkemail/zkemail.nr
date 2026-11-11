@@ -46,15 +46,13 @@ pub fn limbs120x18_to_limbs121x17(limbs120x18: [Field; KEY_LIMBS_2048]) -> [Fiel
 // Fold K x 121-bit limbs into K_out Poseidon inputs
 pub fn fold_limbs121<let K: u32, let K_out: u32>(limbs121: [Field; K]) -> [Field; K_out] {
     assert(K >= 2, "K must be >= 2");
-    assert(K_out >= 1, "K_out must be >= 1");
-    assert(K_out <= K, "K_out must be <= K");
-    assert(2 * K_out <= K + 1, "K_out must satisfy 2*K_out <= K + 1");
+    assert(K_out == (K + 1) / 2, "K_out must be ceil(K / 2)");
 
     let base_121 = 2.pow_32(121);
     let mut input = [0; K_out];
     for i in 0..K_out {
-        if i == K_out - 1 {
-            input[i] = limbs121[K - 1];
+        if 2 * i + 1 == K {
+            input[i] = limbs121[2 * i];
         } else {
             input[i] = limbs121[2 * i] + base_121 * limbs121[2 * i + 1]; // 2 * i + 1 < K
         }
