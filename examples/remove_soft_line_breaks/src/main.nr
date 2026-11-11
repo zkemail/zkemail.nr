@@ -46,7 +46,7 @@ fn main(
 
     // ~ 113,962 constraints
     // hash the asserted body
-    let computed_body_hash: [u8; 32] = sha256_var(body.storage(), body.len() as u64);
+    let computed_body_hash: [u8; 32] = sha256_var(body.storage(), body.len());
 
     // compare the body hashes
     assert(

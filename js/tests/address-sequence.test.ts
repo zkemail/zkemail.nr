@@ -26,12 +26,32 @@ describe("address sequences stay inside the complete named field", () => {
     expect(extracted(header).index).toBe(header.indexOf("real@example.org"));
   });
   it.each(["\r\n ", "\r\n\t"])("includes folded continuation %j", (fold) => {
-    const field = `From: Display${fold}<real@example.org> (comment)`;
+    const field = `From: Display${fold}<real@example.org>`;
     expect(extracted(Buffer.from(`${field}\r\nsubject:next`))).toMatchObject({ field, address: "real@example.org" });
   });
-  it("returns the complete field including trailing comments", () => {
-    const field = "from:Display <real@example.org> (comment)";
-    expect(extracted(Buffer.from(field)).field).toBe(field);
+  // The circuit rejects these (headers/mod.nr scan_address_field, headers/email_address.nr), so the
+  // input generator does too.
+  it.each([
+    "From: Display\r\n <real@example.org> (comment)",
+    "from:Display (comment) <real@example.org>",
+    'from:"Dis\\"play" <real@example.org>',
+    'from:"Display <real@example.org>',
+    "from:<real@example.org> trailing",
+    'from:"<other@example.org>" real@example.org',
+    'from:real@example.org "x"',
+    "from:<real@example.org>\n",
+    "from:\treal@example.org",
+    "from:real@example.org ",
+  ])("rejects syntax the circuit rejects %j", (header) => {
+    expect(() => getAddressHeaderSequence(Buffer.from(header), "from")).toThrow();
+  });
+  it.each([
+    ['from:"Doe, John (Sales)" <jd@example.org>', "jd@example.org"],
+    ["From: <real@example.org> \t", "real@example.org"],
+    ["From: Display\r\n <real@example.org>\r\n \r\nsubject:next", "real@example.org"],
+    ["from: real@example.org\r\n\t\r\nsubject:next", "real@example.org"],
+  ])("accepts what the circuit accepts %j", (header, address) => {
+    expect(extracted(Buffer.from(header)).address).toBe(address);
   });
   it("supports a last field without a trailing CRLF", () => {
     expect(extracted(Buffer.from("to:a@example.org"), "to").address).toBe("a@example.org");
