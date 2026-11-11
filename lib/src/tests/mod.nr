@@ -924,6 +924,196 @@ mod test_address_early_value_boundaries {
     }
 }
 
+// The selected address must end the address field, so a '<' or an address inside a comment or a
+// quoted string cannot be selected instead of the real one.
+mod test_address_end_anchor {
+    use crate::{headers::email_address::get_email_address, Sequence};
+
+    // a '<' inside a comment after the address
+    #[test(should_fail_with = "Address fields must not contain comments")]
+    fn test_address_in_trailing_comment_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:<bob@evil.com> (<ceo@bank.com>)\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 36 },
+            Sequence { index: 22, length: 12 },
+            from,
+        );
+    }
+
+    // as above, with the comment left open at the end of the field
+    #[test(should_fail_with = "Address fields must not contain comments")]
+    fn test_address_in_unterminated_comment_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:<bob@evil.com> (<ceo@bank.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 35 },
+            Sequence { index: 22, length: 12 },
+            from,
+        );
+    }
+
+    // a '<' inside a quoted string before a bare address
+    #[test(should_fail_with = "Email address and its closing '>' must end the field")]
+    fn test_address_in_quoted_display_name_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:\"<ceo@bank.com>\" bob@evil.com\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 34 },
+            Sequence { index: 7, length: 12 },
+            from,
+        );
+    }
+
+    // a bare address inside a quoted string after the real one
+    #[test(should_fail_with = "Email address must end the field if no bracket is present")]
+    fn test_bare_address_in_quoted_string_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:bob@evil.com \"x ceo@bank.com>\"\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 35 },
+            Sequence { index: 21, length: 12 },
+            from,
+        );
+    }
+
+    // a '<' inside a quoted string left open at the end of the field
+    #[test(should_fail_with = "Address fields must not end inside a quoted string")]
+    fn test_address_in_unterminated_quote_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:bob@evil.com \"<ceo@bank.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 33 },
+            Sequence { index: 20, length: 12 },
+            from,
+        );
+    }
+
+    // if `\"` were read as a plain quote, the quoted string would look closed
+    #[test(should_fail_with = "Address fields must not contain backslashes")]
+    fn test_address_after_escaped_quote_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:bob@evil.com \"\\\"<ceo@bank.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 35 },
+            Sequence { index: 22, length: 12 },
+            from,
+        );
+    }
+
+    // the address is followed by LF, not '>'
+    #[test(should_fail_with = "Email address and its closing '>' must end the field")]
+    fn test_bracketed_address_closed_by_lf_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:<a@b.cd\n\r\nto:x@y.zz\r\n".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 13 },
+            Sequence { index: 6, length: 6 },
+            from,
+        );
+    }
+
+    // text after the closing '>'
+    #[test(should_fail_with = "Email address and its closing '>' must end the field")]
+    fn test_bracketed_address_followed_by_text_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:<bob@evil.com> x\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 21 },
+            Sequence { index: 6, length: 12 },
+            from,
+        );
+    }
+
+    // a comment before the address is rejected too
+    #[test(should_fail_with = "Address fields must not contain comments")]
+    fn test_comment_in_display_name_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:Bob (Work) <bob@x.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 27 },
+            Sequence { index: 17, length: 9 },
+            from,
+        );
+    }
+
+    // '(' inside a quoted display name is plain text
+    #[test]
+    fn test_parenthesis_in_quoted_display_name_accepted() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:\"Doe, John (Sales)\" <jd@corp.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let address = get_email_address(
+            header,
+            Sequence { index: 0, length: 38 },
+            Sequence { index: 26, length: 11 },
+            from,
+        );
+        assert(address == BoundedVec::from_array(comptime { "jd@corp.com".as_bytes() }));
+    }
+
+    // c=simple keeps folds, name case and trailing whitespace
+    #[test]
+    fn test_folded_field_with_trailing_whitespace_accepted() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime {
+                "From: \"Doe, John\"\r\n <jd@corp.com> \t\r\n \r\nto:x@y.zz\r\n".as_bytes()
+            },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let address = get_email_address(
+            header,
+            Sequence { index: 0, length: 38 },
+            Sequence { index: 21, length: 11 },
+            from,
+        );
+        assert(address == BoundedVec::from_array(comptime { "jd@corp.com".as_bytes() }));
+    }
+
+    // a bare address followed by a fold that holds only whitespace
+    #[test]
+    fn test_bare_address_with_trailing_fold_accepted() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from: jd@corp.com\r\n\t\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let address = get_email_address(
+            header,
+            Sequence { index: 0, length: 20 },
+            Sequence { index: 6, length: 11 },
+            from,
+        );
+        assert(address == BoundedVec::from_array(comptime { "jd@corp.com".as_bytes() }));
+    }
+}
+
 mod test_body_hash_authenticated_length {
     use crate::{headers::body_hash::get_body_hash, Sequence};
 

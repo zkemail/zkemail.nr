@@ -215,10 +215,23 @@ export function getAddressHeaderSequence(header: Buffer, headerField: string) {
   const fields = findHeaderFields(header, name);
   if (fields.length !== 1) throw new Error(`Expected exactly one "${name}" field`);
   const { index, end } = fields[0];
-  // Use byte offsets, the complete field (including folds/comments), and only search its value.
+  // Use byte offsets, the complete field (including folds), and only search its value.
   // Searching the entire header can select a lookalike in Subject or an earlier repeated address.
   const valueStart = index + name.length + 1;
   const value = header.subarray(valueStart, end).toString("latin1");
+  // The circuit (scan_address_field in headers/mod.nr) rejects a backslash, a '(' outside a quoted
+  // string and an unclosed quoted string, and get_email_address requires the address to end the
+  // field, followed only by '>' if bracketed and then by folding whitespace. Fail here with a clear
+  // error instead of in witness generation.
+  let quoted = false;
+  for (const char of value) {
+    if (char === "\\") throw new Error("Backslashes are not supported in address fields");
+    if (char === "(" && !quoted) throw new Error("Comments are not supported in address fields");
+    if (char === '"') quoted = !quoted;
+  }
+  if (quoted) throw new Error("Unterminated quoted string in address field");
+  // folding whitespace as the circuit counts it: SP, HTAB, and the CRLF of a fold
+  const isFoldingWhitespace = (text: string) => /^(?:[ \t]|\r\n[ \t])*$/.test(text);
   const bracket = value.lastIndexOf("<");
   let offset: number;
   let address: string;
@@ -231,9 +244,16 @@ export function getAddressHeaderSequence(header: Buffer, headerField: string) {
     if (value.slice(0, bracket).includes(">") || value.slice(close + 1).includes("@")) {
       throw new Error("Multiple addresses are not supported");
     }
+    if (!isFoldingWhitespace(value.slice(close + 1))) throw new Error("The address must end the field");
   } else {
-    address = value.trim();
-    offset = value.indexOf(address);
+    // Not value.trim(): it also strips bytes the circuit does not treat as whitespace (a lone LF, a
+    // no-break space). The circuit requires the byte before a bare address to be ':' or SP, and the
+    // byte after it to be the CR of a fold or the end of the field.
+    offset = /^(?:[ \t]|\r\n[ \t])*/.exec(value)![0].length;
+    const trailing = /(?:[ \t]|\r\n[ \t])*$/.exec(value.slice(offset))![0];
+    address = value.slice(offset, value.length - trailing.length);
+    if (offset > 0 && value[offset - 1] !== " ") throw new Error("A bare address must follow ':' or a space");
+    if (trailing !== "" && !trailing.startsWith("\r\n")) throw new Error("The address must end the field");
   }
   // Match the circuit's intentionally restricted character set; do not silently extract a
   // supported-looking suffix from unsupported syntax (e.g. the tail of a plus-address).
