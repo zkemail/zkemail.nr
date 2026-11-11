@@ -25,7 +25,7 @@ mod test_success {
         );
         // compute the body hash
         let computed_body_hash: [u8; 32] =
-            sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len() as u64);
+            sha256_var(EmailLarge::BODY.storage(), EmailLarge::BODY.len());
         // compare the body hashes
         assert(
             signed_body_hash == computed_body_hash,
@@ -86,7 +86,10 @@ mod test_success {
 }
 
 mod test_tampered_hash {
-    use crate::{headers::body_hash::get_body_hash, tests::test_inputs::EmailLarge};
+    use crate::{
+        headers::body_hash::get_body_hash,
+        tests::test_inputs::{EmailLarge, SyntheticKey1024, SyntheticKey2048},
+    };
     use sha256::sha256_var;
 
     // no reasonable message to constrain here
@@ -109,8 +112,7 @@ mod test_tampered_hash {
         // get tampered body
         let mut tampered_body = unsafe { EmailLarge::tampered_body() };
         // compute the body hash
-        let tampered_body_hash: [u8; 32] =
-            sha256_var(tampered_body.storage(), tampered_body.len() as u64);
+        let tampered_body_hash: [u8; 32] = sha256_var(tampered_body.storage(), tampered_body.len());
         // compare the body hashes
         assert(
             signed_body_hash != tampered_body_hash,
@@ -126,6 +128,54 @@ mod test_tampered_hash {
         sig[0] += delta * 0x1000000000000000000000000000000;
         sig[1] -= delta;
         pubkey.verify_dkim_signature(EmailLarge::HEADER, sig);
+    }
+
+    // The library's range checks carry no message of their own, so the three tests below can only
+    // match "call to assert_max_bit_size", which the 120-bit limb check and `validate_in_field`
+    // share. Each test's inputs are chosen so that only one of the two checks can fail.
+
+    #[test(should_fail_with = "call to assert_max_bit_size")]
+    fn test_dkim_signature_limb_above_u128() {
+        // Fails in the 120-bit limb check of `convert_field_to_u128`. Without that check, `as u128`
+        // drops the 2^128 term, which leaves the original signature: reduced, and valid.
+        let mut sig = EmailLarge::SIGNATURE;
+        sig[0] += 0x100000000000000000000000000000000;
+        EmailLarge::PUBKEY.verify_dkim_signature(EmailLarge::HEADER, sig);
+    }
+
+    #[test]
+    fn test_dkim_signature_synthetic_1024() {
+        SyntheticKey1024::PUBKEY.verify_dkim_signature(
+            SyntheticKey1024::MESSAGE,
+            SyntheticKey1024::SIGNATURE,
+        );
+    }
+
+    #[test(should_fail_with = "call to assert_max_bit_size")]
+    fn test_dkim_signature_not_reduced() {
+        // Fails in `validate_in_field`: n - (s + n) underflows, so a limb of the difference fails
+        // its range check. Every limb of s + n is below 2^120, so the limb check passes.
+        SyntheticKey1024::PUBKEY.verify_dkim_signature(
+            SyntheticKey1024::MESSAGE,
+            SyntheticKey1024::SIGNATURE_PLUS_MODULUS,
+        );
+    }
+
+    #[test]
+    fn test_dkim_signature_synthetic_2048() {
+        SyntheticKey2048::PUBKEY.verify_dkim_signature(
+            SyntheticKey2048::MESSAGE,
+            SyntheticKey2048::SIGNATURE,
+        );
+    }
+
+    #[test(should_fail_with = "call to assert_max_bit_size")]
+    fn test_dkim_signature_not_reduced_2048() {
+        // As above, for the 2048-bit `verify_dkim_signature`: fails in `validate_in_field`.
+        SyntheticKey2048::PUBKEY.verify_dkim_signature(
+            SyntheticKey2048::MESSAGE,
+            SyntheticKey2048::SIGNATURE_PLUS_MODULUS,
+        );
     }
 }
 
@@ -170,7 +220,7 @@ mod test_redc_binding_2048 {
     }
 
     /// Guard: the largest top limb the hash covers (17 bits) is still accepted. Honest keys use
-    /// at most 13 bits there (2048-bit modulus, 2^(2k+4) redc; see js/tests/redc-bound.test.ts).
+    /// at most 15 bits there (2048-bit modulus, 2^(2k+6) redc; see js/tests/redc-bound.test.ts).
     #[test]
     fn test_redc_top_limb_17_bits_accepted_2048() {
         let pubkey = EmailLarge::PUBKEY;
@@ -208,6 +258,21 @@ mod test_redc_binding_1024 {
     }
 }
 
+mod test_fold_limbs {
+    use crate::hash::fold_limbs121;
+
+    #[test]
+    fn test_fold_even_limb_count() {
+        let base = 2.pow_32(121);
+        assert_eq(fold_limbs121::<4, 2>([1, 2, 3, 4]), [1 + base * 2, 3 + base * 4]);
+    }
+
+    #[test(should_fail_with = "K_out must be ceil(K / 2)")]
+    fn test_fold_rejects_dropped_limbs() {
+        let _ = fold_limbs121::<5, 2>([1, 2, 3, 4, 5]);
+    }
+}
+
 mod header_field_access {
 
     use crate::{headers::body_hash::get_body_hash, Sequence, tests::test_inputs::EmailLarge};
@@ -237,7 +302,7 @@ mod header_field_access {
         // create header field for malicious bh
         let mut dkim_field: BoundedVec<u8, EmailLarge::EMAIL_LARGE_MAX_HEADER_LENGTH> =
             BoundedVec::new();
-        dkim_field.len = EmailLarge::HEADER.len();
+        dkim_field = BoundedVec::from_parts(dkim_field.storage(), EmailLarge::HEADER.len());
         // craft a malicious "to" field where attacker tries to put bh in display name
         let mut malicious_to: [u8; 78] = comptime {
             "\r\nto:\"bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=;\" <zkewtest@gmail.com>\r\n"
@@ -249,7 +314,7 @@ mod header_field_access {
         };
         for i in 0..malicious_to.len() {
             let index = malicious_sequence.index + i - 2;
-            dkim_field.storage[index] = malicious_to[i];
+            dkim_field.set_unchecked(index, malicious_to[i]);
         }
         let malicious_body_hash_index = 15;
         // copy the body hash to the beginning of the
@@ -263,7 +328,7 @@ mod header_field_access {
             "dkim-signature:bh=2JsdK4BMzzt9w4Zlz2TdyVCFc+l7vNyT5aAgGDYf7fM=; v=1; a=rsa-sha256; c=relaxed/relaxed; d=icloud.com; s=1a1hai; t=1712141644; h=from:Content-Type:Mime-Version:Subject:Message-Id:Date:to; b="
                 .as_bytes()
         };
-        let header: BoundedVec<u8, 203> = BoundedVec { storage: dkim_field, len: 203 };
+        let header: BoundedVec<u8, 203> = BoundedVec::from_array(dkim_field);
         let mut dkim_field_sequence = Sequence { index: 0, length: 203 };
         let body_hash_index = 18;
         let _ = get_body_hash(header, dkim_field_sequence, body_hash_index);
@@ -284,7 +349,7 @@ mod header_field_access {
         overflowed_sequence.length = overflowed_sequence.length + 1;
         // set header len to be a bit longer so it doesn't overflow
         let mut longer_header = EmailLarge::HEADER;
-        longer_header.len = longer_header.len + 2;
+        longer_header = BoundedVec::from_parts(longer_header.storage(), longer_header.len() + 2);
         // attempt to get body hash
         let _ = get_body_hash(
             longer_header,
@@ -343,7 +408,8 @@ mod header_field_access {
                 + EmailLarge::DKIM_HEADER_SEQUENCE.length
                 + 2, // 2 for crlf in middle
         };
-        tampered_header.len = combined_sequence.length + 4;
+        tampered_header =
+            BoundedVec::from_parts(tampered_header.storage(), combined_sequence.length + 4);
         // copy dkim-signature field
         for i in 0..EmailLarge::DKIM_HEADER_SEQUENCE.length + 2 {
             tampered_header.set(
@@ -373,8 +439,10 @@ mod header_field_access {
     fn test_header_field_outside_header() {
         let mut shortened_header = EmailLarge::HEADER;
         // shorten header to be just under the end of the dkim field
-        shortened_header.len =
-            EmailLarge::DKIM_HEADER_SEQUENCE.index + EmailLarge::DKIM_HEADER_SEQUENCE.length - 1;
+        shortened_header = BoundedVec::from_parts(
+            shortened_header.storage(),
+            EmailLarge::DKIM_HEADER_SEQUENCE.index + EmailLarge::DKIM_HEADER_SEQUENCE.length - 1,
+        );
         // attempt to get body hash
         let _ = get_body_hash(
             shortened_header,
@@ -583,7 +651,7 @@ mod test_header_field_canonicalization {
     #[test(should_fail_with = "Header field must not contain newlines")]
     fn test_fold_completed_by_padding_rejected() {
         let storage: [u8; 16] = comptime { "x-test:a\r\n zzzzz".as_bytes() };
-        let header: BoundedVec<u8, 16> = BoundedVec::from_parts_unchecked(storage, 9);
+        let header: BoundedVec<u8, 16> = BoundedVec::from_parts(storage, 9);
         let name: [u8; 6] = comptime { "x-test".as_bytes() };
         constrain_header_field::<16, 32, 6>(header, Sequence { index: 0, length: 9 }, name);
     }
@@ -752,7 +820,7 @@ mod test_header_field_boundaries {
     #[test(should_fail_with = "Header field too short to contain name and colon")]
     fn test_field_shorter_than_name_rejected() {
         let storage: [u8; 16] = comptime { "\r\nfrom:a@b.cd   ".as_bytes() };
-        let header: BoundedVec<u8, 16> = BoundedVec::from_parts_unchecked(storage, 4);
+        let header: BoundedVec<u8, 16> = BoundedVec::from_parts(storage, 4);
         let from: [u8; 4] = comptime { "from".as_bytes() };
         constrain_header_field::<16, 32, 4>(header, Sequence { index: 2, length: 2 }, from);
     }
@@ -856,6 +924,196 @@ mod test_address_early_value_boundaries {
     }
 }
 
+// The selected address must end the address field, so a '<' or an address inside a comment or a
+// quoted string cannot be selected instead of the real one.
+mod test_address_end_anchor {
+    use crate::{headers::email_address::get_email_address, Sequence};
+
+    // a '<' inside a comment after the address
+    #[test(should_fail_with = "Address fields must not contain comments")]
+    fn test_address_in_trailing_comment_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:<bob@evil.com> (<ceo@bank.com>)\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 36 },
+            Sequence { index: 22, length: 12 },
+            from,
+        );
+    }
+
+    // as above, with the comment left open at the end of the field
+    #[test(should_fail_with = "Address fields must not contain comments")]
+    fn test_address_in_unterminated_comment_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:<bob@evil.com> (<ceo@bank.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 35 },
+            Sequence { index: 22, length: 12 },
+            from,
+        );
+    }
+
+    // a '<' inside a quoted string before a bare address
+    #[test(should_fail_with = "Email address and its closing '>' must end the field")]
+    fn test_address_in_quoted_display_name_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:\"<ceo@bank.com>\" bob@evil.com\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 34 },
+            Sequence { index: 7, length: 12 },
+            from,
+        );
+    }
+
+    // a bare address inside a quoted string after the real one
+    #[test(should_fail_with = "Email address must end the field if no bracket is present")]
+    fn test_bare_address_in_quoted_string_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:bob@evil.com \"x ceo@bank.com>\"\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 35 },
+            Sequence { index: 21, length: 12 },
+            from,
+        );
+    }
+
+    // a '<' inside a quoted string left open at the end of the field
+    #[test(should_fail_with = "Address fields must not end inside a quoted string")]
+    fn test_address_in_unterminated_quote_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:bob@evil.com \"<ceo@bank.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 33 },
+            Sequence { index: 20, length: 12 },
+            from,
+        );
+    }
+
+    // if `\"` were read as a plain quote, the quoted string would look closed
+    #[test(should_fail_with = "Address fields must not contain backslashes")]
+    fn test_address_after_escaped_quote_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:bob@evil.com \"\\\"<ceo@bank.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 35 },
+            Sequence { index: 22, length: 12 },
+            from,
+        );
+    }
+
+    // the address is followed by LF, not '>'
+    #[test(should_fail_with = "Email address and its closing '>' must end the field")]
+    fn test_bracketed_address_closed_by_lf_rejected() {
+        let header: BoundedVec<u8, 64> =
+            BoundedVec::from_array(comptime { "from:<a@b.cd\n\r\nto:x@y.zz\r\n".as_bytes() });
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 13 },
+            Sequence { index: 6, length: 6 },
+            from,
+        );
+    }
+
+    // text after the closing '>'
+    #[test(should_fail_with = "Email address and its closing '>' must end the field")]
+    fn test_bracketed_address_followed_by_text_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:<bob@evil.com> x\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 21 },
+            Sequence { index: 6, length: 12 },
+            from,
+        );
+    }
+
+    // a comment before the address is rejected too
+    #[test(should_fail_with = "Address fields must not contain comments")]
+    fn test_comment_in_display_name_rejected() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:Bob (Work) <bob@x.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let _ = get_email_address(
+            header,
+            Sequence { index: 0, length: 27 },
+            Sequence { index: 17, length: 9 },
+            from,
+        );
+    }
+
+    // '(' inside a quoted display name is plain text
+    #[test]
+    fn test_parenthesis_in_quoted_display_name_accepted() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from:\"Doe, John (Sales)\" <jd@corp.com>\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let address = get_email_address(
+            header,
+            Sequence { index: 0, length: 38 },
+            Sequence { index: 26, length: 11 },
+            from,
+        );
+        assert(address == BoundedVec::from_array(comptime { "jd@corp.com".as_bytes() }));
+    }
+
+    // c=simple keeps folds, name case and trailing whitespace
+    #[test]
+    fn test_folded_field_with_trailing_whitespace_accepted() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime {
+                "From: \"Doe, John\"\r\n <jd@corp.com> \t\r\n \r\nto:x@y.zz\r\n".as_bytes()
+            },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let address = get_email_address(
+            header,
+            Sequence { index: 0, length: 38 },
+            Sequence { index: 21, length: 11 },
+            from,
+        );
+        assert(address == BoundedVec::from_array(comptime { "jd@corp.com".as_bytes() }));
+    }
+
+    // a bare address followed by a fold that holds only whitespace
+    #[test]
+    fn test_bare_address_with_trailing_fold_accepted() {
+        let header: BoundedVec<u8, 64> = BoundedVec::from_array(
+            comptime { "from: jd@corp.com\r\n\t\r\nto:x@y.zz\r\n".as_bytes() },
+        );
+        let from: [u8; 4] = comptime { "from".as_bytes() };
+        let address = get_email_address(
+            header,
+            Sequence { index: 0, length: 20 },
+            Sequence { index: 6, length: 11 },
+            from,
+        );
+        assert(address == BoundedVec::from_array(comptime { "jd@corp.com".as_bytes() }));
+    }
+}
+
 mod test_body_hash_authenticated_length {
     use crate::{headers::body_hash::get_body_hash, Sequence};
 
@@ -865,7 +1123,7 @@ mod test_body_hash_authenticated_length {
         let storage: [u8; 64] = comptime {
             "dkim-signature:bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;X".as_bytes()
         };
-        let header: BoundedVec<u8, 64> = BoundedVec::from_parts_unchecked(storage, 62);
+        let header: BoundedVec<u8, 64> = BoundedVec::from_parts(storage, 62);
         let _ = get_body_hash(header, Sequence { index: 0, length: 62 }, 18);
     }
 
@@ -1117,7 +1375,7 @@ mod test_masking {
     #[test]
     fn test_mask_text_zeroes_bytes_past_len() {
         let text: BoundedVec<u8, 8> =
-            BoundedVec::from_parts_unchecked([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
+            BoundedVec::from_parts([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
         let masked = mask_text(text, [true; 8]);
         assert(masked == [0x61, 0x62, 0x63, 0x64, 0, 0, 0, 0]);
     }
@@ -1125,8 +1383,33 @@ mod test_masking {
     #[test]
     fn test_mask_text_applies_mask_within_len() {
         let text: BoundedVec<u8, 8> =
-            BoundedVec::from_parts_unchecked([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
+            BoundedVec::from_parts([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68], 4);
         let masked = mask_text(text, [true, false, true, false, true, true, true, true]);
         assert(masked == [0x61, 0, 0x63, 0, 0, 0, 0, 0]);
+    }
+}
+
+mod test_rsa_bytes_to_limbs {
+    use crate::{tests::test_inputs::EmailLarge, utils::rsa_bytes_to_limbs};
+
+    #[test]
+    fn test_modulus_bytes_to_limbs() {
+        let modulus_bytes: [u8; 256] = [
+            213, 145, 31, 110, 71, 248, 77, 179, 182, 76, 54, 72, 235, 181, 161, 39, 161, 188, 15,
+            9, 55, 72, 156, 128, 108, 25, 68, 253, 2, 157, 201, 113, 89, 7, 129, 223, 17, 78, 192,
+            114, 230, 65, 205, 197, 210, 36, 81, 52, 220, 57, 102, 200, 233, 20, 2, 102, 154, 71,
+            204, 133, 151, 10, 40, 31, 38, 138, 68, 178, 26, 79, 119, 169, 26, 82, 249, 96, 106, 48,
+            201, 242, 45, 46, 92, 182, 147, 66, 99, 208, 131, 136, 9, 28, 86, 172, 29, 251, 241,
+            190, 234, 49, 232, 166, 19, 194, 165, 31, 85, 13, 105, 90, 81, 77, 56, 180, 92, 134, 35,
+            32, 160, 14, 165, 57, 65, 154, 67, 61, 107, 253, 209, 151, 131, 86, 203, 202, 75, 96,
+            10, 87, 15, 229, 130, 145, 140, 79, 115, 26, 0, 2, 6, 141, 242, 139, 42, 25, 48, 137,
+            230, 191, 149, 28, 85, 59, 90, 111, 113, 170, 173, 204, 102, 105, 223, 163, 70, 243, 34,
+            113, 120, 81, 168, 194, 42, 50, 64, 65, 175, 135, 54, 232, 125, 228, 53, 136, 96, 255,
+            240, 87, 190, 255, 63, 25, 4, 106, 67, 173, 206, 70, 201, 50, 81, 73, 136, 175, 225, 48,
+            159, 135, 65, 75, 211, 110, 210, 150, 218, 207, 173, 226, 224, 202, 240, 50, 53, 233,
+            26, 45, 178, 126, 158, 210, 20, 188, 198, 229, 207, 153, 91, 94, 245, 156, 233, 148, 61,
+            31, 66, 9, 182, 171,
+        ];
+        assert_eq(rsa_bytes_to_limbs(modulus_bytes), EmailLarge::PUBKEY.modulus);
     }
 }

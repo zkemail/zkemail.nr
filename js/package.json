@@ -12,10 +12,10 @@
     "prepublishOnly": "yarn lint && yarn build"
   },
   "dependencies": {
-    "@aztec/bb.js": "0.84.0",
+    "@aztec-foundation/bb.js": "6.0.0",
     "@mach-34/noir-bignum-paramgen": "^1.1.2",
-    "@noir-lang/noir_js": "1.0.0-beta.5",
-    "@noir-lang/noirc_abi": "1.0.0-beta.5",
+    "@noir-lang/noir_js": "1.0.0",
+    "@noir-lang/noirc_abi": "1.0.0",
     "@types/circomlibjs": "^0.1.6",
     "@zk-email/helpers": "^6.3.2",
     "circomlibjs": "^0.1.7"

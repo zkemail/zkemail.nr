@@ -190,3 +190,14 @@ fn test_pack_bytes_max_element_size_with_padding() {
     assert(packed[0] == expected0);
     assert(packed[1] == expected1);
 }
+
+/// Convert a big-endian RSA modulus or signature of BYTES bytes into the little-endian
+/// 120-bit limbs taken by `RSAPubkey`.
+pub fn rsa_bytes_to_limbs<let BYTES: u32, let LIMBS: u32>(bytes: [u8; BYTES]) -> [Field; LIMBS] {
+    std::static_assert(LIMBS == (BYTES + 14) / 15, "LIMBS must be ceil(BYTES / 15)");
+    let mut limbs: [Field; LIMBS] = [0; LIMBS];
+    for i in 0..BYTES {
+        limbs[i / 15] += bytes[BYTES - 1 - i] as Field * 2.pow_32(8 * (i % 15) as Field);
+    }
+    limbs
+}
