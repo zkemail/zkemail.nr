@@ -9,8 +9,8 @@ use rsa::{rsa::verify_sha256_pkcs1v15, types::{RBN1024, RBN2048}};
 use sha256::sha256_var;
 
 pub struct RSAPubkey<let KEY_LIMBS: u32> {
-    modulus: [Field; KEY_LIMBS],
-    redc: [Field; KEY_LIMBS],
+    pub(crate) modulus: [Field; KEY_LIMBS],
+    pub(crate) redc: [Field; KEY_LIMBS],
 }
 
 impl<let KEY_LIMBS: u32> RSAPubkey<KEY_LIMBS> {
@@ -28,7 +28,7 @@ impl RSAPubkey<KEY_LIMBS_1024> {
         signature: [Field; KEY_LIMBS_1024],
     ) -> [u8; 32] {
         // hash the header
-        let header_hash = sha256_var(header.storage(), header.len() as u64);
+        let header_hash = sha256_var(header.storage(), header.len());
 
         let params: BigNumParams<KEY_LIMBS_1024, 1024> = BigNumParams::new(
             false,
@@ -38,7 +38,7 @@ impl RSAPubkey<KEY_LIMBS_1024> {
 
         let signature: RBN1024 =
             RuntimeBigNum::from_array(params, convert_field_to_u128(signature));
-        signature.validate_in_range();
+        signature.validate_in_field();
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
@@ -69,7 +69,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
         signature: [Field; KEY_LIMBS_2048],
     ) -> [u8; 32] {
         // hash the header
-        let header_hash = sha256_var(header.storage(), header.len() as u64);
+        let header_hash = sha256_var(header.storage(), header.len());
 
         let params: BigNumParams<KEY_LIMBS_2048, 2048> = BigNumParams::new(
             false,
@@ -79,7 +79,7 @@ impl RSAPubkey<KEY_LIMBS_2048> {
 
         let signature: RBN2048 =
             RuntimeBigNum::from_array(params, convert_field_to_u128(signature));
-        signature.validate_in_range();
+        signature.validate_in_field();
 
         // verify the DKIM signature over the header
         assert(verify_sha256_pkcs1v15(header_hash, signature, RSA_EXPONENT));
@@ -115,6 +115,9 @@ impl RSAPubkey<KEY_LIMBS_2048> {
 fn convert_field_to_u128<let KEY_LIMBS: u32>(signature: [Field; KEY_LIMBS]) -> [u128; KEY_LIMBS] {
     let mut u128_signature: [u128; KEY_LIMBS] = [0; KEY_LIMBS];
     for i in 0..KEY_LIMBS {
+        // a limb of 120 bits or fewer converts exactly; `as u128` alone would drop any multiple of
+        // 2^128, so limb + 2^128 would verify as limb
+        signature[i].assert_max_bit_size::<120>();
         u128_signature[i] = signature[i] as u128;
     }
     u128_signature

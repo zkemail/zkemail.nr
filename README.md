@@ -29,7 +29,8 @@ use zkemail::{
     KEY_LIMBS_1024, dkim::RSAPubkey, get_body_hash_by_index,     
     base64::body_hash_base64_decode
 };
-use std::hash::{sha256_var, pedersen_hash};
+use sha256::sha256_var;
+use std::hash::pedersen_hash;
 
 // Somewhere in your function
 ...
@@ -38,7 +39,7 @@ use std::hash::{sha256_var, pedersen_hash};
   // extract the body hash from the header
   let signed_body_hash = get_body_hash(header, dkim_header_sequence, body_hash_index);
   // compute the sha256 hash of the asserted body
-  let computed_body_hash: [u8; 32] = sha256_var(body.storage, body.len() as u64);
+  let computed_body_hash: [u8; 32] = sha256_var(body.storage(), body.len());
   // constain the computed body hash to match the one found in the header
   assert(
     signed_body_hash == computed_body_hash,
